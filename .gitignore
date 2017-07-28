@@ -101,7 +101,8 @@ ENV/
 .mypy_cache/
 
 # Data
-/data/.*
+data/*
+!data/.gitkeep 
 .csv
 .xls
 .xlsx
