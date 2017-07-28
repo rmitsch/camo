@@ -56,6 +56,7 @@ function makeGraphs(error, projectsJson, statesJson) {
 	// Define Dimensions.
 	var amountDim               = ndx.dimension(function(d) { return d["Amount"]; });
 	var dateDim                 = ndx.dimension(function(d) { return d3.time.month(d["ExactDate"]); });
+    var monthDateDim            = ndx.dimension(function(d) { return d3.time.month(d["ExactDate"]); });
 	var categoryDim             = ndx.dimension(function(d) { return d["Category"]; });
 	var weekDateDim             = ndx.dimension(function(d) { return d3.time.week(d["ExactDate"]); });
 	var dayDateDim              = ndx.dimension(function(d) { return d["ExactDate"]; });
@@ -110,7 +111,7 @@ function makeGraphs(error, projectsJson, statesJson) {
     var amountByUser            = actorDim.group().reduceSum(function(d) {return d["Amount"];});
 
     // For monthly balance boxplot.
-    var monthlyBalance          = dateDim.group().reduceSum(d => d["Amount"]);
+    var monthlyBalance          = monthDateDim.group().reduceSum(d => d["Amount"]);
 
 	// Determine extrema.
 	// For dates.
@@ -288,9 +289,10 @@ function makeGraphs(error, projectsJson, statesJson) {
         .height(365)
 //        .y(d3.scale.linear().domain([-maxExpensesByMonth * 1.1, maxIncomeByMonth * 1.1]))
         .elasticY(true)
-        .dimension(dateDim) // this is actually wrong but can't brush anyway
+        .dimension(monthDateDim) // this is actually wrong but can't brush anyway
         .group(one_bin(monthlyBalance, 'All months'))
-        .margins({top: 5, right: 20, bottom: 50, left: 65});
+        .margins({top: 5, right: 20, bottom: 50, left: 65})
+        .yAxis.ticks(5);
 
     // Configure user charts.
     balanceByUserChart
