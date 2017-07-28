@@ -292,7 +292,7 @@ function makeGraphs(error, projectsJson, statesJson) {
         .dimension(monthDateDim) // this is actually wrong but can't brush anyway
         .group(one_bin(monthlyBalance, 'All months'))
         .margins({top: 5, right: 20, bottom: 50, left: 65})
-        .yAxis.ticks(5);
+        .yAxis().ticks(6);
 
     // Configure user charts.
     balanceByUserChart
