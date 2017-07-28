@@ -2,7 +2,7 @@
 
 // Initiates loading of charts.
 queue()
-    .defer(d3.json, "/camo/entries")
+    .defer(d3.json, "/entries")
     .await(makeGraphs);
 
 // Used for accumulating values in an existing grouping/measure.

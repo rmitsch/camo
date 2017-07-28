@@ -25,7 +25,7 @@ def allowed_file(filename):
 app = Flask(__name__)
 
 # This is the path to the upload directory
-app.config['UPLOAD_FOLDER'] = '../data/'
+app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/")
 # These are the extension that we are accepting to be uploaded.
 # Currently only .ods supported.
 app.config['ALLOWED_EXTENSIONS'] = set(['ods'])
@@ -60,7 +60,7 @@ def dashboard():
 
 
 # Route for fetching data from spreadsheet.
-@app.route("/camo/entries")
+@app.route("/entries")
 def getEntries():
     # Read from file with hardcoded file path.
     reader = ODSReader(os.path.join(app.config['UPLOAD_FOLDER'], "spreadsheet.ods"))

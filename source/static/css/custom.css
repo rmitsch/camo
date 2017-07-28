@@ -86,3 +86,7 @@ div.panel {
     padding: 0.625rem 1.25rem;
     /* 10px 20px */
 }
+
+#title_icon {
+    margin-right: 7px;
+}
