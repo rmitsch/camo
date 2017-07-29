@@ -32,11 +32,65 @@ function one_bin(group, key) {
   };
 }
 
+// Create accordion for entry table.
+function createAccordionForEntryTable()
+{
+    var acc = document.getElementsByClassName("accordion");
+    var i;
+
+    for (i = 0; i < acc.length; i++) {
+        acc[i].onclick = function(){
+            /* Toggle between adding and removing the "active" class,
+            to highlight the button that controls the panel */
+            this.classList.toggle("active");
+
+            /* Toggle between hiding and showing the active panel */
+            var panel = this.nextElementSibling;
+            if (panel.style.display === "block") {
+                panel.style.display = "none";
+            } else {
+                panel.style.display = "block";
+            }
+        }
+    }
+}
+
+// Remove empty bins. Extended by functionality to add top() and bottom().
+// https://github.com/dc-js/dc.js/wiki/FAQ#remove-empty-bins
+function remove_empty_bins(group) {
+    return {
+        all: function () {
+            return group.all().filter(function(d) {
+                return d.value.count !== 0;
+            });
+        },
+
+        top: function(N) {
+            return group.top(N).filter(function(d) {
+                return d.value.count !== 0;
+            });
+        },
+
+        bottom: function(N) {
+            return group.top(Infinity).slice(-N).reverse().filter(function(d) {
+                return d.value.count !== 0;
+            });
+        }
+    };
+}
+
+
 // Creates graphs for dashboard.
 function makeGraphs(error, projectsJson, statesJson) {
 
-    // Prepare and extend projectsJson data.
-	var entries = projectsJson;
+    // Original entries as delivered by the backend.
+	var entries         = projectsJson;
+	// Collection of entries multiplied because of multiple beneficiaries.
+	var unfoldedEntries = [];
+	// Auxiliary variable.
+    var binWidth                = 5;
+
+	// Prepare and extend projectsJson data.
 	entries.forEach(function(d) {
     	// Add entry for exact date.
         d["ExactDate"] = new Date(d["Date"]);
@@ -45,21 +99,64 @@ function makeGraphs(error, projectsJson, statesJson) {
 		d["Date"] = new Date(d["Date"]);
 		d["Date"].setDate(1);
 		d["Amount"] = +d["Amount"];
+		d["roundedAmount"] = Math.floor(+d["Amount"] / binWidth) * binWidth;
 
-		// Add entry for boxplot by month and income/expenses:
+		// From here: Split up lines with multiple beneficiaries.
+		// Goal: One record per beneficiary so that crossfilter.js' framework
+		// can operate on the dataset.
+		// All related measures (count, sums etc.) have to take care only to consider
+		// strictly relevant/original records.
+		d["originalAmount"] = d["Amount"];
+		var beneficiaries   = d["Beneficiaries"].split(", ");
+
+		// Loop over beneficiaries in this record.
+		beneficiaries.forEach(function(beneficiary) {
+		    // If beneficiary is payer/active agent: Only modify current record.
+		    if (beneficiary === d["Payer"]) {
+		        // Calculate split amount.
+		        d["Amount"]         = d["originalAmount"] / beneficiaries.length;
+		    }
+		    // Else: Append new record to entries.
+		    // Note that all these records have ID -1 and amount = 0.
+		    else {
+		        // For starters: Copy existing record.
+		        var newRecord = {};
+                Object.keys(d).forEach(function(key) {
+                     newRecord[key] = d[key];
+                });
+
+		        newRecord["ID"]             = -1;
+		        newRecord["Amount"]         = d["originalAmount"] / beneficiaries.length;
+		        newRecord["originalAmount"] = 0;
+
+		        // Append new record to set of entries.
+		        unfoldedEntries.push(newRecord);
+		    }
+
+            // Append new column "Beneficiary".
+            d["Beneficiary"] = beneficiary;
+        });
 	});
+
+    // Add unfolded entries to regular ones.
+    entries = entries.concat(unfoldedEntries);
+
+
+    // --------------------------------------------------
+    // Initialize charts
+    // --------------------------------------------------
 
 	// Create a Crossfilter instance.
 	var ndx = crossfilter(entries);
 
-
 	// Define Dimensions.
 	var amountDim               = ndx.dimension(function(d) { return d["Amount"]; });
+	var roundedAmountDim        = ndx.dimension(function(d) { return d["roundedAmount"]; });
 	var dateDim                 = ndx.dimension(function(d) { return d3.time.month(d["ExactDate"]); });
     var monthDateDim            = ndx.dimension(function(d) { return d3.time.month(d["ExactDate"]); });
 	var categoryDim             = ndx.dimension(function(d) { return d["Category"]; });
 	var weekDateDim             = ndx.dimension(function(d) { return d3.time.week(d["ExactDate"]); });
-	var dayDateDim              = ndx.dimension(function(d) { return d["ExactDate"]; });
+	var idDim                   = ndx.dimension(function(d) { return d["ID"]; });
 	// For transactions charts.
     var scatterchartDim         = ndx.dimension(function (d) {
                                     return [+d["ExactDate"], d["Amount"], d["Amount"] > 0 ? "Income" : "Expenses"];
@@ -89,20 +186,128 @@ function makeGraphs(error, projectsJson, statesJson) {
 	// For category charts.
 	var sumByCategory       = categoryDim.group().reduceSum(function(d) {return d["Amount"];});
 
+    // For entry table.
+    var tableGroup          = idDim.group().reduce(
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.push(item);
+                elements.count++;
+            }
+
+            return elements;
+        },
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.splice(elements.transactions.indexOf(item), 1);
+                elements.count--;
+            }
+
+            return elements;
+        },
+        function() {
+            return {transactions: [], count: 0, id: 0};
+        }
+    );
+
+//         next steps:
+//            - create reciepient balance chart (call user balance, drop old one?)
+//            - create community balance chart
+//            - use bubble chart instead of scatterplot
+//            - refactor
+//            - dockerize
+
     // For measures.
     // Get group for all entries, regardless of feature values.
     // Apparent outcome: Number of projects.
-	var all                 = ndx.groupAll();
+	var all                 = ndx.groupAll().reduce(
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.push(item);
+                elements.count++;
+            }
+
+            return elements;
+        },
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.splice(elements.transactions.indexOf(item), 1);
+                elements.count--;
+            }
+
+            return elements;
+        },
+        function() {
+            return {transactions: [], count: 0};
+        }
+    );
 	// Get group for total amount of money spent.
     // Apparent outcome: Sum of money spent.
 	var totalAmount         = ndx.groupAll().reduceSum(function(d) {return d["Amount"];});
 
     // For transactions charts.
-    // Auxiliary variable.
-    var binWidth                = 100;
-    var numTransactionsByDate   = weekDateDim.group();
-    var transactionsByAmount    = amountDim.group().reduceCount(function(d) {return binWidth * Math.floor(d["Amount"] / binWidth);});
-    var scatterchartGroup       = scatterchartDim.group();
+    var numTransactionsByDate   = weekDateDim.group().reduce(
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.push(item);
+                elements.count++;
+            }
+
+            return elements;
+        },
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.splice(elements.transactions.indexOf(item), 1);
+                elements.count--;
+            }
+
+            return elements;
+        },
+        function() {
+            return {transactions: [], count: 0};
+        }
+    );
+    var transactionsByAmount    = roundedAmountDim.group().reduce(
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.push(item);
+                elements.count++;
+            }
+
+            return elements;
+        },
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.splice(elements.transactions.indexOf(item), 1);
+                elements.count--;
+            }
+
+            return elements;
+        },
+        function() {
+            return {transactions: [], count: 0};
+        }
+    );
+    var scatterchartGroup       = scatterchartDim.group().reduce(
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.push(item);
+                elements.count++;
+            }
+
+            return elements;
+        },
+        function(elements, item) {
+            if (item["ID"] !== -1) {
+                elements.transactions.splice(elements.transactions.indexOf(item), 1);
+                elements.count--;
+            }
+
+            return elements;
+        },
+        function() {
+            return {transactions: [], count: 0};
+        }
+    );
 
     // For user chart.
     var paidByUser              = actorDim.group().reduceSum(function(d) {return d["Amount"] < 0 ? d["Amount"] : 0;});
@@ -111,7 +316,7 @@ function makeGraphs(error, projectsJson, statesJson) {
     var amountByUser            = actorDim.group().reduceSum(function(d) {return d["Amount"];});
 
     // For monthly balance boxplot.
-    var monthlyBalance          = monthDateDim.group().reduceSum(d => d["Amount"]);
+    var monthlyBalance          = monthDateDim.group().reduceSum(d => d["originalAmount"]);
 
 	// Determine extrema.
 	// For dates.
@@ -121,8 +326,8 @@ function makeGraphs(error, projectsJson, statesJson) {
     minDate.setDate(minDate.getDate() - 5);
     maxDate.setDate(maxDate.getDate() + 5);
     // For amounts.
-    var minAmount   = amountDim.bottom(1)[0]["Amount"];
-    var maxAmount   = amountDim.top(1)[0]["Amount"];
+    var minAmount   = amountDim.bottom(1)[0]["originalAmount"];
+    var maxAmount   = amountDim.top(1)[0]["originalAmount"];
     // For sum by user and transaction type.
     // Reason for loop: Bottom method not existent.
     var maxAmountByUserandTType = 0;
@@ -220,12 +425,14 @@ function makeGraphs(error, projectsJson, statesJson) {
 		.formatNumber(d3.format("d"))
 		.transitionDuration(0)
 		.valueAccessor(function(d){return d; })
-		.group(all);
+		.group(all)
+		.valueAccessor( function(d) { return d.count; } );
 
     // Configure transactions frequency plot.
     transactionAmountChart
-        .dimension(amountDim)
+        .dimension(roundedAmountDim)
         .group(transactionsByAmount, 'Transaction amount')
+        .valueAccessor( function(d) { return d.value.count; } )
         .x(d3.scale.linear().domain([minAmount, maxAmount + 100]))
         .ordinalColors(['#377eb8'])
         .yAxisLabel("n")
@@ -242,6 +449,7 @@ function makeGraphs(error, projectsJson, statesJson) {
     transactionFrequencyChart
         .dimension(weekDateDim)
         .group(numTransactionsByDate, 'Transaction frequency')
+        .valueAccessor( function(d) { return d.value.count; } )
         .x(d3.time.scale().domain([minDate, maxDate]))
         .ordinalColors(['#377eb8'])
         .renderHorizontalGridLines(true)
@@ -269,7 +477,7 @@ function makeGraphs(error, projectsJson, statesJson) {
         .dimension(scatterchartDim)
         .group(scatterchartGroup)
         .existenceAccessor(function(d) {
-            return d.value > 0;
+            return d.value.transactions.length > 0 && d.value.transactions[0]["Amount"] != 0;
         })
         .colorAccessor(function(d) {
             return d.key[2];
@@ -313,23 +521,24 @@ function makeGraphs(error, projectsJson, statesJson) {
      // Data table for individual entries.
     entriesTable
         .height(800)
-        .dimension(dayDateDim)
+        .dimension((remove_empty_bins(tableGroup)))
         .group(function(d) {
             return "";
          })
         .size(10000)
         .columns([
-          function(d) { return d["ID"]; },
-          function(d) { return d["Subject"]; },
-          function(d) { return d["Category"]; },
-          function(d) { return d["Comment"]; },
-          function(d) { return d["Partner"]; },
-          function(d) { return d["Date"]; },
-          function(d) { return d["Payer"]; },
-          function(d) { return d["Beneficiaries"]; },
-          function(d) { return d["Amount"]; }
+          function(d) { return d.value.transactions[0]["ID"]; },
+          function(d) { return d.value.transactions[0]["Subject"]; },
+          function(d) { return d.value.transactions[0]["Category"]; },
+          function(d) { return d.value.transactions[0]["Comment"]; },
+          function(d) { return d.value.transactions[0]["Partner"]; },
+          function(d) { return d.value.transactions[0]["Date"]; },
+          function(d) { return d.value.transactions[0]["Payer"]; },
+          function(d) { return d.value.transactions[0]["Beneficiaries"]; },
+          // Re-calculate original amount
+          function(d) { return d.value.transactions[0]["originalAmount"]; }
         ])
-        .sortBy(function(d){ return d["ID"]; })
+        .sortBy(function(d){ return d.value.transactions[0]["ID"]; })
         .order(d3.ascending);
 
     // Render charts.
@@ -342,27 +551,3 @@ function makeGraphs(error, projectsJson, statesJson) {
     createAccordionForEntryTable();
 
 };
-
-
-// Create accordion for entry table.
-function createAccordionForEntryTable()
-{
-    var acc = document.getElementsByClassName("accordion");
-    var i;
-
-    for (i = 0; i < acc.length; i++) {
-        acc[i].onclick = function(){
-            /* Toggle between adding and removing the "active" class,
-            to highlight the button that controls the panel */
-            this.classList.toggle("active");
-
-            /* Toggle between hiding and showing the active panel */
-            var panel = this.nextElementSibling;
-            if (panel.style.display === "block") {
-                panel.style.display = "none";
-            } else {
-                panel.style.display = "block";
-            }
-        }
-    }
-}
