@@ -79,6 +79,35 @@ function remove_empty_bins(group) {
     };
 }
 
+// Utility function to find if value exists in array.
+// Source: https://stackoverflow.com/questions/1181575/determine-whether-an-array-contains-a-value
+var contains = function(needle) {
+    // Per spec, the way to identify NaN is that it is not equal to itself
+    var findNaN = needle !== needle;
+    var indexOf;
+
+    if(!findNaN && typeof Array.prototype.indexOf === 'function') {
+        indexOf = Array.prototype.indexOf;
+    } else {
+        indexOf = function(needle) {
+            var i = -1, index = -1;
+
+            for(i = 0; i < this.length; i++) {
+                var item = this[i];
+
+                if((findNaN && item !== item) || item === needle) {
+                    index = i;
+                    break;
+                }
+            }
+
+            return index;
+        };
+    }
+
+    return indexOf.call(this, needle) > -1;
+};
+
 
 // Creates graphs for dashboard.
 function makeGraphs(error, projectsJson, statesJson) {
@@ -88,7 +117,7 @@ function makeGraphs(error, projectsJson, statesJson) {
 	// Collection of entries multiplied because of multiple beneficiaries.
 	var unfoldedEntries = [];
 	// Auxiliary variable.
-    var binWidth                = 5;
+    var binWidth        = 50;
 
 	// Prepare and extend projectsJson data.
 	entries.forEach(function(d) {
@@ -109,16 +138,34 @@ function makeGraphs(error, projectsJson, statesJson) {
 		d["originalAmount"] = d["Amount"];
 		var beneficiaries   = d["Beneficiaries"].split(", ");
 
+        // Modify current record in order to provide correct unfolding:
+        // If beneficiaries other than the agent are involved, the correct amount
+        // for the agent has to be calculated.
+        // todo Possible bug: Agent is mentioned as beneficiary multiple times. Should be checked in backend.
+        // todo Rename column "Payer" to "Agent".
+        if (!contains.call(beneficiaries, d["Payer"]) || beneficiaries.length > 1) {
+            // Calculate split amount.
+            // If this is an amortization: Amount has to be treated differently, since agent
+            // has to bear full effect of transaction.
+            if (d["Category"] === "Amortization") {
+                d["Amount"] = -d["Amount"];
+            }
+
+            else {
+                // If agent is a beneficary: Amount is 1/n of original amount. Otherwise: 0.
+                d["Amount"] = contains.call(beneficiaries, d["Payer"]) ? d["originalAmount"] / beneficiaries.length : 0;
+            }
+        }
+        // Append beneficiary. In this case: Agent. If agent is not involved - no effects, since amount is
+        // 0 and count of records doesn't change.
+        d["Beneficiary"] = d["Payer"];
+
 		// Loop over beneficiaries in this record.
 		beneficiaries.forEach(function(beneficiary) {
-		    // If beneficiary is payer/active agent: Only modify current record.
-		    if (beneficiary === d["Payer"]) {
-		        // Calculate split amount.
-		        d["Amount"]         = d["originalAmount"] / beneficiaries.length;
-		    }
-		    // Else: Append new record to entries.
+		    // If beneficiary is not payer/active agent: Append new record to entries.
+		    // Ignore if beneficiary is agent, since that has been handled before the loop already.
 		    // Note that all these records have ID -1 and amount = 0.
-		    else {
+		    if (beneficiary !== d["Payer"]) {
 		        // For starters: Copy existing record.
 		        var newRecord = {};
                 Object.keys(d).forEach(function(key) {
@@ -128,15 +175,15 @@ function makeGraphs(error, projectsJson, statesJson) {
 		        newRecord["ID"]             = -1;
 		        newRecord["Amount"]         = d["originalAmount"] / beneficiaries.length;
 		        newRecord["originalAmount"] = 0;
+                // Append new column for beneficiary of new shadow record.
+                newRecord["Beneficiary"] = beneficiary;
 
 		        // Append new record to set of entries.
 		        unfoldedEntries.push(newRecord);
 		    }
-
-            // Append new column "Beneficiary".
-            d["Beneficiary"] = beneficiary;
         });
 	});
+
 
     // Add unfolded entries to regular ones.
     entries = entries.concat(unfoldedEntries);
@@ -159,15 +206,17 @@ function makeGraphs(error, projectsJson, statesJson) {
 	var idDim                   = ndx.dimension(function(d) { return d["ID"]; });
 	// For transactions charts.
     var scatterchartDim         = ndx.dimension(function (d) {
-                                    return [+d["ExactDate"], d["Amount"], d["Amount"] > 0 ? "Income" : "Expenses"];
+                                    return [+d["ExactDate"], d["originalAmount"], d["originalAmount"] > 0 ? "Income" : "Expenses"];
                                });
     // For user charts:
     var actorDim                = ndx.dimension(function(d) { return d["Payer"]; });
     var actorIncomeExpenseDim   = ndx.dimension(function (d) {
                                     return [d["Amount"] > 0 ? "Income" : "Expenses", d["Payer"]];
                                 });
+    var beneficiaryDim          = ndx.dimension(function(d) { return d["Beneficiary"]; });
     // For various stuff: Derive dimension from value of amount.
     var incomeExpenseDim        = ndx.dimension(function(d) { return d["Amount"] < 0 ? "Expenses" : "Income"; });
+
 
     // --------------------------------------------------
     // Create groups (~ metrics) to use in charts
@@ -210,8 +259,6 @@ function makeGraphs(error, projectsJson, statesJson) {
     );
 
 //         next steps:
-//            - create reciepient balance chart (call user balance, drop old one?)
-//            - create community balance chart
 //            - use bubble chart instead of scatterplot
 //            - refactor
 //            - dockerize
@@ -310,13 +357,39 @@ function makeGraphs(error, projectsJson, statesJson) {
     );
 
     // For user chart.
-    var paidByUser              = actorDim.group().reduceSum(function(d) {return d["Amount"] < 0 ? d["Amount"] : 0;});
-    var receivedByUser          = actorDim.group().reduceSum(function(d) {return d["Amount"] > 0 ? d["Amount"] : 0;});
-    var amountByUserAndTType    = actorIncomeExpenseDim.group().reduceSum(function(d) {return d["Amount"];});
-    var amountByUser            = actorDim.group().reduceSum(function(d) {return d["Amount"];});
+    var paidByUser                  = actorDim.group().reduceSum(function(d) {return d["Amount"] < 0 ? d["Amount"] : 0;});
+    var receivedByUser              = actorDim.group().reduceSum(function(d) {return d["Amount"] > 0 ? d["Amount"] : 0;});
+    var amountByUserAndTType        = actorIncomeExpenseDim.group().reduceSum(function(d) {return d["Amount"];});
+    var amountByUser                = actorDim.group().reduceSum(function(d) {return d["Amount"];});
+    var amountByBeneficiary         = beneficiaryDim.group().reduceSum(function(d) {return d["Amount"];});
+    var balanceForCommunity         = beneficiaryDim.group().reduceSum(function(d) {
+                                        // If record is original and multiple beneficiaries involved: Make sure
+                                        // agents contribution is considered correctly.
+                                        if (d["ID"] !== -1 && d["Payer"] === d["Beneficiary"]) {
+                                            // Deduct agent's amount. If agent is no benficiary, this amount is 0.
+                                            // Otherwise: Contributed by agent -> amount for all others - total amount.
+                                            //
+                                            // If this is an amortization: Has to be treated differently in order to
+                                            // achieve parity with non-relevant measures. Therefore: Modify equation
+                                            // to calculate contribution to community balance.
+                                            return d["Category"] !== "Amortization" ?
+                                                    (d["Amount"] - d["originalAmount"]) : d["Amount"];
+                                        }
+
+                                        // If record is an unfolded one: Return amount for this user and record.
+                                        if (d["ID"] === -1 && d["Payer"] !== d["Beneficiary"]) {
+                                            // Since someone else handled this transaction, the amount for the passive
+                                            // user is equal to what should contribute to the community balance.
+                                            return d["Amount"];
+                                        }
+
+                                        // Ignore all other cases - i. e., entries where agent is the sole beneficiary
+                                        //  - not relevant for community balance.
+                                        return 0;
+                                    });
 
     // For monthly balance boxplot.
-    var monthlyBalance          = monthDateDim.group().reduceSum(d => d["originalAmount"]);
+    var monthlyBalance = monthDateDim.group().reduceSum(d => d["originalAmount"]);
 
 	// Determine extrema.
 	// For dates.
@@ -359,7 +432,9 @@ function makeGraphs(error, projectsJson, statesJson) {
     // Monthly balances.
     var monthlyBalanceChart             = dc.boxPlot("#monthly-balance-chart");
     // User charts.
-    var balanceByUserChart              = dc.barChart("#user-balance-chart");
+    var balanceByUserChart              = dc.barChart("#agent-balance-chart");
+    var balanceByBeneficiaryChart       = dc.barChart("#beneficiary-balance-chart");
+    var balanceForCommunityChart        = dc.barChart("#community-balance-chart");
 
     // Configure time chart.
     var expenseSumByDateChart   = dc.lineChart(timeChart)
@@ -494,17 +569,20 @@ function makeGraphs(error, projectsJson, statesJson) {
 
     // Configure monthly balance chart.
     monthlyBalanceChart
-        .height(365)
+        .height(275)
 //        .y(d3.scale.linear().domain([-maxExpensesByMonth * 1.1, maxIncomeByMonth * 1.1]))
         .elasticY(true)
+        .yAxisLabel('€')
         .dimension(monthDateDim) // this is actually wrong but can't brush anyway
         .group(one_bin(monthlyBalance, 'All months'))
         .margins({top: 5, right: 20, bottom: 50, left: 65})
+        .renderHorizontalGridLines(true)
         .yAxis().ticks(6);
 
-    // Configure user charts.
+    // Configure agent balance chart.
     balanceByUserChart
-        .height(200)
+        .height(150)
+        .width(175)
         .y(d3.scale.linear().domain([minAmountByUserandTType, maxAmountByUserandTType]))
         .x(d3.scale.ordinal())
         .xUnits(dc.units.ordinal)
@@ -515,7 +593,44 @@ function makeGraphs(error, projectsJson, statesJson) {
         .group(amountByUser)
         .barPadding(0.1)
         .renderHorizontalGridLines(true)
-        .margins({top: 5, right: 20, bottom: 50, left: 55})
+        .margins({top: 5, right: 20, bottom: 50, left: 45})
+        .yAxis().ticks(4);
+
+    // Configure beneficary balance charts.
+    balanceByBeneficiaryChart
+        .height(150)
+        .width(175)
+        .y(d3.scale.linear().domain([minAmountByUserandTType, maxAmountByUserandTType]))
+        .x(d3.scale.ordinal())
+        .xUnits(dc.units.ordinal)
+        .brushOn(false)
+        .xAxisLabel('User')
+        .yAxisLabel('€')
+        .dimension(beneficiaryDim)
+        .group(amountByBeneficiary)
+        .barPadding(0.1)
+        .renderHorizontalGridLines(true)
+        .margins({top: 5, right: 20, bottom: 50, left: 45})
+        .yAxis().ticks(4);
+
+    // todo In backend: Make sure agent is not included in list of beneficiaries for amortizations.
+    // Configure community balance charts.
+    balanceForCommunityChart
+        .height(150)
+        .width(175)
+//        .y(d3.scale.linear().domain([minAmountByUserandTType, maxAmountByUserandTType]))
+        .elasticY(true)
+        .x(d3.scale.ordinal())
+        .xUnits(dc.units.ordinal)
+        .brushOn(false)
+        .xAxisLabel('User')
+        .yAxisLabel('€')
+        .dimension(beneficiaryDim)
+        .group(balanceForCommunity)
+        .valueAccessor(function(d) { return d.value; })
+        .barPadding(0.1)
+        .renderHorizontalGridLines(true)
+        .margins({top: 5, right: 20, bottom: 50, left: 45})
         .yAxis().ticks(4);
 
      // Data table for individual entries.

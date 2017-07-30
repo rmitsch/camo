@@ -90,3 +90,13 @@ div.panel {
 #title_icon {
     margin-right: 7px;
 }
+
+/* Shamelessly hacking CSS for keen.io. */
+#categoryContainer {
+    padding-right: 5px;
+}
+
+#monthlyBalanceContainer {
+    padding-left: 5px;
+    padding-right: 5px;
+}

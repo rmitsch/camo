@@ -48,7 +48,7 @@
 
           <!--<div class="col-sm-12">-->
           <!-- By categories -->
-          <div class="col-sm-6">
+          <div class="col-sm-6" id="categoryContainer">
             <div class="chart-wrapper">
               <div class="chart-title">
                 By categories
@@ -60,7 +60,21 @@
           </div>
           <!-- Income by categories -->
 
-        <div class="col-sm-3">
+          <!-- Monthly balance boxplot -->
+          <div class="col-sm-4" id="monthlyBalanceContainer">
+            <div class="chart-wrapper">
+              <div class="chart-title">
+                Monthly balance
+              </div>
+              <div class="chart-stage">
+                <div id="monthly-balance-chart"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Monthly balance boxplot -->
+
+          <!-- Total balance -->
+          <div class="col-sm-2">
             <div class="chart-wrapper">
               <div class="chart-title">
                 Balance
@@ -73,7 +87,7 @@
           <!-- Total balance -->
 
           <!-- Number of transactions -->
-          <div class="col-sm-3">
+          <div class="col-sm-2">
             <div class="chart-wrapper">
               <div class="chart-title">
                 Count
@@ -84,19 +98,6 @@
             </div>
           </div>
           <!-- Number of transactions -->
-
-          <!-- User balance -->
-          <div class="col-sm-6">
-              <div class="chart-wrapper">
-                  <div class="chart-title">
-                    Balance by user
-                  </div>
-                  <div class="chart-stage">
-                    <div id="user-balance-chart"></div>
-                  </div>
-              </div>
-          </div>
-          <!-- User balance -->
       </div>
 
       <!-- Transaction amount -->
@@ -125,21 +126,8 @@
       </div>
       <!-- Transactions frequency -->
 
-      <!-- Monthly balance boxplot -->
-      <div class="col-sm-2">
-        <div class="chart-wrapper">
-          <div class="chart-title">
-            Monthly balance
-          </div>
-          <div class="chart-stage">
-            <div id="monthly-balance-chart"></div>
-          </div>
-        </div>
-      </div>
-      <!-- Monthly balance boxplot -->
-
       <!-- Individual transactions -->
-      <div class="col-sm-4">
+      <div class="col-sm-6">
         <div class="chart-wrapper">
           <div class="chart-title">
             Individual transactions
@@ -151,11 +139,37 @@
       </div>
       <!-- Individual Transactions -->
 
-      <!-- Community balance -->
-      <div class="col-sm-4">
+      <!-- Balance by agent -->
+      <div class="col-sm-2">
           <div class="chart-wrapper">
               <div class="chart-title">
-                Balances between users
+                Balance by agent
+              </div>
+              <div class="chart-stage">
+                <div id="agent-balance-chart"></div>
+              </div>
+          </div>
+      </div>
+      <!-- Balance by agent -->
+
+      <!-- Balance by beneficiary -->
+      <div class="col-sm-2">
+          <div class="chart-wrapper">
+              <div class="chart-title">
+                Balance by beneficiary
+              </div>
+              <div class="chart-stage">
+                <div id="beneficiary-balance-chart"></div>
+              </div>
+          </div>
+      </div>
+      <!-- Balance by beneficiary -->
+
+      <!-- Community balance -->
+      <div class="col-sm-2">
+          <div class="chart-wrapper">
+              <div class="chart-title">
+                Community balance
               </div>
               <div class="chart-stage">
                 <div id="community-balance-chart"></div>
@@ -209,7 +223,7 @@
     <script src="./static/lib/js/queue.js"></script>
 
 
-    <script src="./static/lib/js/keen.min.js"></script>
+    <!--<script src="./static/lib/js/keen.min.js"></script>-->
     <script src='./static/js/graphs.js' type='text/javascript'></script>
 
 </body>
