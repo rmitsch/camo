@@ -1,7 +1,6 @@
 //         next steps:
 //            - use bubble chart instead of scatterplot
 //            - use log scale for histogram of amount (?)
-//            - refactor
 //            - add todos to github
 //            - dockerize
 
@@ -23,16 +22,14 @@ function makeGraphs(error, projectsJson, statesJson) {
     // --------------------------------------------------
     // Prepare and extend projectsJson data.
     // --------------------------------------------------
-    prepareRecords(entries, binWidth);
+    entries = prepareRecords(entries, binWidth);
 
     // --------------------------------------------------
     // Initialize charts.
     // --------------------------------------------------
 
-	// Create a Crossfilter instance.
-	var ndx = crossfilter(entries);
     // Get chart data.
-    var charts = generateGraphObjects(ndx, dc);
+    var charts = generateGraphObjects(entries, dc);
 
     // --------------------------------------------------
     // Configure and plot charts.

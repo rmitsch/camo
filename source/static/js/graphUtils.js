@@ -75,6 +75,8 @@ function prepareRecords(entries, binWidth)
         d["Amount"] = +d["Amount"];
         d["roundedAmount"] = Math.floor(+d["Amount"] / binWidth) * binWidth;
 
+
+
         // From here: Split up lines with multiple beneficiaries.
         // Goal: One record per beneficiary so that crossfilter.js' framework
         // can operate on the dataset.
@@ -83,11 +85,13 @@ function prepareRecords(entries, binWidth)
         d["originalAmount"] = d["Amount"];
         var beneficiaries   = d["Beneficiaries"].split(", ");
 
+
         // Modify current record in order to provide correct unfolding:
         // If beneficiaries other than the agent are involved, the correct amount
         // for the agent has to be calculated.
         // todo Possible bug: Agent is mentioned as beneficiary multiple times. Should be checked in backend.
         // todo Rename column "Payer" to "Agent".
+
         if (!contains.call(beneficiaries, d["Payer"]) || beneficiaries.length > 1) {
             // Calculate split amount.
             // If this is an amortization: Amount has to be treated differently, since agent
@@ -104,6 +108,7 @@ function prepareRecords(entries, binWidth)
         // Append beneficiary. In this case: Agent. If agent is not involved - no effects, since amount is
         // 0 and count of records doesn't change.
         d["Beneficiary"] = d["Payer"];
+
 
         // Loop over beneficiaries in this record.
         beneficiaries.forEach(function(beneficiary) {
@@ -131,6 +136,8 @@ function prepareRecords(entries, binWidth)
 
     // Add unfolded entries to regular ones.
     entries = entries.concat(unfoldedEntries);
+
+    return entries;
 }
 
 /**
@@ -148,8 +155,11 @@ function prepareRecords(entries, binWidth)
  * @param ndx Crossfilter instance.
  * @param dc dc.js instance.
  */
-function generateGraphObjects(ndx, dc)
+function generateGraphObjects(entries, dc)
 {
+	// Create a Crossfilter instance.
+	var ndx = crossfilter(entries);
+
     // Initialize associative collection of all charts.
     var charts = {};
 
@@ -363,14 +373,14 @@ function generateGraphObjects(ndx, dc)
                                             // achieve parity with non-relevant measures. Therefore: Modify equation
                                             // to calculate contribution to community balance.
                                             return d["Category"] !== "Amortization" ?
-                                                    (d["Amount"] - d["originalAmount"]) : d["Amount"];
+                                                    (d["Amount"] - d["originalAmount"]) : d["Amount"] * 1000;
                                         }
 
                                         // If record is an unfolded one: Return amount for this user and record.
                                         if (d["ID"] === -1 && d["Payer"] !== d["Beneficiary"]) {
                                             // Since someone else handled this transaction, the amount for the passive
                                             // user is equal to what should contribute to the community balance.
-                                            return d["Amount"];
+                                            return d["Amount"] * 1000;
                                         }
 
                                         // Ignore all other cases - i. e., entries where agent is the sole beneficiary
@@ -421,7 +431,8 @@ function generateGraphObjects(ndx, dc)
 	charts.balanceByAgentBarchart.dimension         = actorDim;
 	charts.balanceByBeneficiaryBarchart.dimension   = beneficiaryDim;
 	charts.communityBalanceBarchart.dimension       = beneficiaryDim;
-    charts.entriesTable.dimension                   = (remove_empty_bins(tableGroup));
+    // Special case for table: Group is used as dimension.
+    charts.entriesTable.dimension               = (remove_empty_bins(tableGroup));
 
 	// --------------------------------------------------
 	// 5. Assign group values to objects.
