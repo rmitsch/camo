@@ -19,7 +19,7 @@
 }
 
 /* Style the buttons that are used to open and close the accordion panel */
-button.accordion {
+div.accordion {
     background-color: #ccebff;
     color: #666;
     cursor: pointer;
@@ -99,4 +99,10 @@ div.panel {
 #monthlyBalanceContainer {
     padding-left: 5px;
     padding-right: 5px;
+}
+
+/* Styling search field. */
+#transactionSearch {
+    float: right;
+    cursor: text;
 }

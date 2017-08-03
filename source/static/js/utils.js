@@ -27,13 +27,33 @@ var contains = function(needle) {
     return indexOf.call(this, needle) > -1;
 };
 
+/**
+ * Create search functionality.
+ */
+function addSearchFunctionalityToTable()
+{
+    var searchField = document.getElementById("transactionSearch");
+
+    searchField.onkeypress = function(e){
+        if (!e) e = window.event;
+        var keyCode = e.keyCode || e.which;
+        if (keyCode == '13'){
+            filterEventsBySearchString(searchField.value);
+        }
+    };
+
+    searchField.onclick = function(e){
+        // Stop event propagation to avoid accordion from toggling.
+        e.stopPropagation();
+    };
+}
+
 // Create accordion for entry table.
 function createAccordionForEntryTable()
 {
     var acc = document.getElementsByClassName("accordion");
-    var i;
 
-    for (i = 0; i < acc.length; i++) {
+    for (var i = 0; i < acc.length; i++) {
         acc[i].onclick = function(){
             /* Toggle between adding and removing the "active" class,
             to highlight the button that controls the panel */
@@ -48,4 +68,14 @@ function createAccordionForEntryTable()
             }
         }
     }
+
+    // Create search functionality.
+    addSearchFunctionalityToTable();
+}
+
+// Round numbers.
+// http://www.jacklmoore.com/notes/rounding-in-javascript/
+function round(value, decimals)
+{
+  return Number(Math.round(value+'e'+decimals)+'e-'+decimals);
 }

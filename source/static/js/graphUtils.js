@@ -1,3 +1,34 @@
+// todo Move global variables and functions into a class.
+// Initialize associative collection of all charts.
+var charts = {};
+
+/**
+ * Accept search string and filter events by it.
+ * Source: https://stackoverflow.com/questions/25083383/custom-text-filter-for-dc-js-datatable
+ * @param searchString
+ */
+function filterEventsBySearchString(searchString)
+{
+    // Create regex for search.
+    var re = new RegExp(searchString, "i");
+
+    // Check on searchString validity.
+    if (searchString != '') {
+        // Filter on categories.
+        charts.shared.recordDim.filter(function(d) {
+            return true == String(d).toLowerCase().includes(searchString.toLowerCase());
+        });
+    }
+    // Otherwise: "Reset" by filtering over all entries.
+    else {
+        // Reset filter.
+        charts.shared.recordDim.filterAll();
+    }
+
+    dc.renderAll();
+    dc.redrawAll();
+}
+
 // Used for accumulating values in an existing grouping/measure.
 // Source: https://stackoverflow.com/questions/40619760/dc-js-crossfilter-add-running-cumulative-sum
 function accumulate_group(source_group)
@@ -47,6 +78,23 @@ function remove_empty_bins(group)
         bottom: function(N) {
             return group.top(Infinity).slice(-N).reverse().filter(function(d) {
                 return d.value.count !== 0;
+            });
+        }
+    };
+}
+
+/**
+ * Round all values to x decimals.
+ * @param group
+ * @param decimalCount
+ * @returns
+ */
+function roundGroup(group, decimalCount)
+{
+    return {
+        all:function () {
+            return group.all().map(function(d) {
+                return {key: d.key, value: round(d.value, decimalCount)};
             });
         }
     };
@@ -157,12 +205,6 @@ function prepareRecords(entries, binWidth)
  */
 function generateGraphObjects(entries, dc)
 {
-	// Create a Crossfilter instance.
-	var ndx = crossfilter(entries);
-
-    // Initialize associative collection of all charts.
-    var charts = {};
-
 	charts.shared                       = {};
 	charts.timeLinechart                = {};
 	charts.categoryRowchart             = {};
@@ -177,9 +219,16 @@ function generateGraphObjects(entries, dc)
 	charts.communityBalanceBarchart     = {};
 	charts.entriesTable                 = {};
     // Subcharts for timeLinechart.
-    charts.timeLinechart.expenseSumByDateLinechart  = {};
-    charts.timeLinechart.revenueSumByDateLinechart  = {};
-    charts.timeLinechart.balanceByDateLinechart     = {};
+    charts.timeLinechart.balanceByDateBarchart             = {};
+    charts.timeLinechart.cumulativeBalanceByDateLinechart   = {};
+
+    // Create a crossfilter instance.
+    charts.shared.crossfilter           = crossfilter(entries);
+    // Create shorthand for crossfilter.
+    var ndx                             = charts.shared.crossfilter;
+
+    // Add dc instance to shared.
+    charts.shared.dc                    = dc;
 
 	// --------------------------------------------------
 	// 1. Set target divs.
@@ -222,6 +271,9 @@ function generateGraphObjects(entries, dc)
     var beneficiaryDim          = ndx.dimension(function(d) { return d["Beneficiary"]; });
     // For various stuff: Derive dimension from value of amount.
     var incomeExpenseDim        = ndx.dimension(function(d) { return d["Amount"] < 0 ? "Expenses" : "Income"; });
+    // Dimension containing stringified record. Used for search.
+    charts.shared.recordDim     = ndx.dimension(function(d) { return JSON.stringify(d); });
+
 
 	// --------------------------------------------------
 	// 3. Define groups/calculate measures.
@@ -229,19 +281,19 @@ function generateGraphObjects(entries, dc)
 
 	// For time chart.
 	// Sum of all entries.
-	var sumByDate           = dateDim.group().reduceSum(function(d) {return d["Amount"];});
+	var sumByDate               = dateDim.group().reduceSum(function(d) {return d["Amount"];});
 	// Cumulative balance up to this point.
-    var balanceByDate       = accumulate_group(sumByDate);
+    var cumulativeBalanceByDate = accumulate_group(sumByDate);
 	// Sum of all expenses.
-	var expenseSumByDate    = dateDim.group().reduceSum(function(d) {return d["Amount"] < 0 ? -d["Amount"] : 0;});
+	var expenseSumByDate        = dateDim.group().reduceSum(function(d) {return d["Amount"] < 0 ? -d["Amount"] : 0;});
 	// Sum of all revenue.
-	var revenueSumByDate    = dateDim.group().reduceSum(function(d) {return d["Amount"] > 0 ? d["Amount"] : 0;});
+	var revenueSumByDate        = dateDim.group().reduceSum(function(d) {return d["Amount"] > 0 ? d["Amount"] : 0;});
 
 	// For category charts.
-	var sumByCategory       = categoryDim.group().reduceSum(function(d) {return d["Amount"];});
+	var sumByCategory           = categoryDim.group().reduceSum(function(d) {return d["Amount"];});
 
     // For entry table.
-    var tableGroup          = idDim.group().reduce(
+    var tableGroup              = idDim.group().reduce(
         function(elements, item) {
             if (item["ID"] !== -1) {
                 elements.transactions.push(item);
@@ -266,7 +318,7 @@ function generateGraphObjects(entries, dc)
     // For measures.
     // Get group for all entries, regardless of feature values.
     // Apparent outcome: Number of projects.
-	var all                 = ndx.groupAll().reduce(
+	var all                     = ndx.groupAll().reduce(
         function(elements, item) {
             if (item["ID"] !== -1) {
                 elements.transactions.push(item);
@@ -289,7 +341,7 @@ function generateGraphObjects(entries, dc)
     );
 	// Get group for total amount of money spent.
     // Apparent outcome: Sum of money spent.
-	var totalAmount         = ndx.groupAll().reduceSum(function(d) {return d["Amount"];});
+	var totalAmount             = ndx.groupAll().reduceSum(function(d) {return d["Amount"];});
 
     // For transactions charts.
     var numTransactionsByDate   = weekDateDim.group().reduce(
@@ -313,7 +365,7 @@ function generateGraphObjects(entries, dc)
             return {transactions: [], count: 0};
         }
     );
-    var transactionsByAmount    = roundedAmountDim.group().reduce(
+    var transactionsByAmount        = roundedAmountDim.group().reduce(
         function(elements, item) {
             if (item["ID"] !== -1) {
                 elements.transactions.push(item);
@@ -334,7 +386,7 @@ function generateGraphObjects(entries, dc)
             return {transactions: [], count: 0};
         }
     );
-    var scatterchartGroup       = scatterchartDim.group().reduce(
+    var scatterchartGroup           = scatterchartDim.group().reduce(
         function(elements, item) {
             if (item["ID"] !== -1) {
                 elements.transactions.push(item);
@@ -373,14 +425,14 @@ function generateGraphObjects(entries, dc)
                                             // achieve parity with non-relevant measures. Therefore: Modify equation
                                             // to calculate contribution to community balance.
                                             return d["Category"] !== "Amortization" ?
-                                                    (d["Amount"] - d["originalAmount"]) : d["Amount"] * 1000;
+                                                    (d["Amount"] - d["originalAmount"]) : d["Amount"];
                                         }
 
                                         // If record is an unfolded one: Return amount for this user and record.
                                         if (d["ID"] === -1 && d["Payer"] !== d["Beneficiary"]) {
                                             // Since someone else handled this transaction, the amount for the passive
                                             // user is equal to what should contribute to the community balance.
-                                            return d["Amount"] * 1000;
+                                            return d["Amount"];
                                         }
 
                                         // Ignore all other cases - i. e., entries where agent is the sole beneficiary
@@ -432,28 +484,28 @@ function generateGraphObjects(entries, dc)
 	charts.balanceByBeneficiaryBarchart.dimension   = beneficiaryDim;
 	charts.communityBalanceBarchart.dimension       = beneficiaryDim;
     // Special case for table: Group is used as dimension.
-    charts.entriesTable.dimension               = (remove_empty_bins(tableGroup));
+    charts.entriesTable.dimension                   = (remove_empty_bins(tableGroup));
 
 	// --------------------------------------------------
 	// 5. Assign group values to objects.
 	// --------------------------------------------------
 
+    // todo Check in backend if users for amortization records are set correctly (x -> {y, z}).
 	charts.timeLinechart.group                  = null;
-	charts.categoryRowchart.group               = sumByCategory;
+	charts.categoryRowchart.group               = roundGroup(sumByCategory, 2);
 	charts.monthlyBalanceBoxplot.group          = one_bin(monthlyBalance, 'All months');
 	charts.balanceLabel.group                   = totalAmount;
 	charts.numberOfTransactionsLabel.group      = all;
 	charts.amountHistogram.group                = transactionsByAmount;
 	charts.transactionFequencyHistogram.group   = numTransactionsByDate;
 	charts.transactionScatterplot.group         = scatterchartGroup;
-	charts.balanceByAgentBarchart.group         = amountByUser;
-	charts.balanceByBeneficiaryBarchart.group   = amountByBeneficiary;
-	charts.communityBalanceBarchart.group       = balanceForCommunity;
+	charts.balanceByAgentBarchart.group         = roundGroup(amountByUser, 2);
+	charts.balanceByBeneficiaryBarchart.group   = roundGroup(amountByBeneficiary, 2);
+	charts.communityBalanceBarchart.group       = roundGroup(balanceForCommunity, 2);
     charts.entriesTable.group                   = null;
     // Subcharts for timeLinechart.
-    charts.timeLinechart.expenseSumByDateLinechart.group    = expenseSumByDate;
-    charts.timeLinechart.revenueSumByDateLinechart.group    = revenueSumByDate;
-    charts.timeLinechart.balanceByDateLinechart.group       = balanceByDate;
+    charts.timeLinechart.balanceByDateBarchart.group           = roundGroup(sumByDate, 2);
+    charts.timeLinechart.cumulativeBalanceByDateLinechart.group = roundGroup(cumulativeBalanceByDate, 2);
 
 	// --------------------------------------------------
 	// 6. Create charts.
@@ -472,9 +524,8 @@ function generateGraphObjects(entries, dc)
 	charts.communityBalanceBarchart.chart       = dc.barChart(charts.communityBalanceBarchart.targetDiv);
     charts.entriesTable.chart                   = dc.dataTable(charts.entriesTable.targetDiv);
     // Subcharts for timeLinechart.
-    charts.timeLinechart.expenseSumByDateLinechart.chart    = dc.lineChart(charts.timeLinechart.chart);
-    charts.timeLinechart.revenueSumByDateLinechart.chart    = dc.lineChart(charts.timeLinechart.chart);
-    charts.timeLinechart.balanceByDateLinechart.chart       = dc.lineChart(charts.timeLinechart.chart);
+    charts.timeLinechart.balanceByDateBarchart.chart            = dc.barChart(charts.timeLinechart.chart);
+    charts.timeLinechart.cumulativeBalanceByDateLinechart.chart = dc.lineChart(charts.timeLinechart.chart);
 
     // Return charts object.
     return charts;
@@ -489,21 +540,15 @@ function generateGraphObjects(entries, dc)
 function plotCharts(charts, dc, binWidth)
 {
     // Configure time chart.
-    var expenseSumByDateChart   = charts.timeLinechart.expenseSumByDateLinechart.chart
-                                    .group(charts.timeLinechart.expenseSumByDateLinechart.group, 'Expenses')
-                                    .colors("red")
-                                    .interpolate("step")
-                                    .renderArea(false);
-    var revenueSumByDateChart   = charts.timeLinechart.revenueSumByDateLinechart.chart
-                                    .group(charts.timeLinechart.revenueSumByDateLinechart.group, 'Revenue')
-                                    .colors("green")
-                                    .interpolate("step")
-                                    .renderArea(false);
-    var balanceByDateChart      = charts.timeLinechart.balanceByDateLinechart.chart
-                                    .group(charts.timeLinechart.balanceByDateLinechart.group, 'Balance')
-                                    .renderDataPoints(true)
-                                    .interpolate("step")
-                                    .renderArea(false);
+    var balanceByDateChart              = charts.timeLinechart.balanceByDateBarchart.chart
+                                            .group(charts.timeLinechart.balanceByDateBarchart.group, 'Balance');
+
+    var cumulativeBalanceByDateChart    = charts.timeLinechart.cumulativeBalanceByDateLinechart.chart
+                                            .group(charts.timeLinechart.cumulativeBalanceByDateLinechart.group, 'Cumulative balance')
+                                            .dashStyle([5, 5])
+                                            .renderDataPoints(true)
+                                            .interpolate("step")
+                                            .renderArea(false);
 
 
     charts.timeLinechart.chart
@@ -520,13 +565,13 @@ function plotCharts(charts, dc, binWidth)
         .x(d3.time.scale().domain([charts.extrema.minDate, charts.extrema.maxDate]))
         .legend(dc.legend().x(80).y(20).itemHeight(13).gap(5))
         .compose([
-            expenseSumByDateChart,
-            revenueSumByDateChart,
-            balanceByDateChart
+            balanceByDateChart,
+            cumulativeBalanceByDateChart
         ])
         .brushOn(true);
     // Set ticks.
-    charts.timeLinechart.chart.yAxis().ticks(4);
+    charts.timeLinechart.chart.yAxis().ticks(5);
+    charts.timeLinechart.chart.xUnits(function(){return 1.55});
 
     // Configure category charts.
 	charts.categoryRowchart.chart
@@ -534,6 +579,7 @@ function plotCharts(charts, dc, binWidth)
         .dimension(charts.categoryRowchart.dimension)
         .group(charts.categoryRowchart.group)
         .ordinalColors(['#377eb8'])
+        .elasticX(true)
         .margins({top: 10, right: 20, bottom: 50, left: 15});
     charts.categoryRowchart.chart.xAxis().ticks(4);
 
@@ -633,7 +679,8 @@ function plotCharts(charts, dc, binWidth)
     charts.balanceByAgentBarchart.chart
         .height(150)
         .width(175)
-        .y(d3.scale.linear().domain([charts.extrema.minAmountByUserandTType, charts.extrema.maxAmountByUserandTType]))
+//        .y(d3.scale.linear().domain([charts.extrema.minAmountByUserandTType, charts.extrema.maxAmountByUserandTType]))
+        .elasticY(true)
         .x(d3.scale.ordinal())
         .xUnits(dc.units.ordinal)
         .brushOn(false)
@@ -650,7 +697,8 @@ function plotCharts(charts, dc, binWidth)
     charts.balanceByBeneficiaryBarchart.chart
         .height(150)
         .width(175)
-        .y(d3.scale.linear().domain([charts.extrema.minAmountByUserandTType, charts.extrema.maxAmountByUserandTType]))
+//        .y(d3.scale.linear().domain([charts.extrema.minAmountByUserandTType, charts.extrema.maxAmountByUserandTType]))
+        .elasticY(true)
         .x(d3.scale.ordinal())
         .xUnits(dc.units.ordinal)
         .brushOn(false)
