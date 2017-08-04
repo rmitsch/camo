@@ -205,6 +205,10 @@ function prepareRecords(entries, binWidth)
  */
 function generateGraphObjects(entries, dc)
 {
+	// --------------------------------------------------
+	// 0. Create objects and auxiliary variables.
+	// --------------------------------------------------
+
 	charts.shared                       = {};
 	charts.timeLinechart                = {};
 	charts.categoryRowchart             = {};
@@ -229,6 +233,9 @@ function generateGraphObjects(entries, dc)
 
     // Add dc instance to shared.
     charts.shared.dc                    = dc;
+
+    // Calculate log of 10.
+    var log10                           = Math.log(10);
 
 	// --------------------------------------------------
 	// 1. Set target divs.
@@ -370,6 +377,8 @@ function generateGraphObjects(entries, dc)
             if (item["ID"] !== -1) {
                 elements.transactions.push(item);
                 elements.count++;
+                // Calculate log count, assuming only positive values.
+                elements.logarithmicCount = elements.count > 0 ? Math.log(elements.count) / log10 : 0;
             }
 
             return elements;
@@ -378,12 +387,14 @@ function generateGraphObjects(entries, dc)
             if (item["ID"] !== -1) {
                 elements.transactions.splice(elements.transactions.indexOf(item), 1);
                 elements.count--;
+                // Calculate log count, assuming only positive values.
+                elements.logarithmicCount = elements.count > 0 ? Math.log(elements.count) / log10 : 0;
             }
 
             return elements;
         },
         function() {
-            return {transactions: [], count: 0};
+            return {transactions: [], count: 0, logarithmicCount: 0};
         }
     );
     var scatterchartGroup           = scatterchartDim.group().reduce(
@@ -539,6 +550,9 @@ function generateGraphObjects(entries, dc)
  */
 function plotCharts(charts, dc, binWidth)
 {
+    // Auxiliary variable for logarithmic scales.
+    var log10 = Math.log(10);
+
     // Configure time chart.
     var balanceByDateChart              = charts.timeLinechart.balanceByDateBarchart.chart
                                             .group(charts.timeLinechart.balanceByDateBarchart.group, 'Balance');
@@ -552,7 +566,7 @@ function plotCharts(charts, dc, binWidth)
 
 
     charts.timeLinechart.chart
-		.height(190)
+		.height(170)
         .margins({top: 10, right: 50, bottom: 40, left: 50})
         .transitionDuration(500)
         .elasticY(true)
@@ -570,18 +584,23 @@ function plotCharts(charts, dc, binWidth)
         ])
         .brushOn(true);
     // Set ticks.
-    charts.timeLinechart.chart.yAxis().ticks(5);
-    charts.timeLinechart.chart.xUnits(function(){return 1.55});
+    charts.timeLinechart.chart.yAxis().ticks(4);
+    // todo Calculate xUnits. How?
+    charts.timeLinechart.chart.xUnits(function(){ return 1.7; });
+    // Format numbers: From 10000 to 10k.
+    charts.timeLinechart.chart.yAxis().tickFormat(d3.format('.2s'))
 
     // Configure category charts.
 	charts.categoryRowchart.chart
-        .height(275)
+        .height(295)
         .dimension(charts.categoryRowchart.dimension)
         .group(charts.categoryRowchart.group)
         .ordinalColors(['#377eb8'])
         .elasticX(true)
         .margins({top: 10, right: 20, bottom: 50, left: 15});
     charts.categoryRowchart.chart.xAxis().ticks(4);
+    // Format numbers: From 10000 to 10k.
+    charts.categoryRowchart.chart.xAxis().tickFormat(d3.format('.2s'))
 
     // Configure measure for total balance.
 	charts.balanceLabel.chart
@@ -591,6 +610,7 @@ function plotCharts(charts, dc, binWidth)
 		.formatNumber(d3.format(".3s"));
 
     // Configure measure for total number of transactions.
+    // todo Use d3's logScale instead of manual calculation for log values (didn't work so far).
 	charts.numberOfTransactionsLabel.chart
 		.formatNumber(d3.format("d"))
 		.transitionDuration(0)
@@ -602,10 +622,11 @@ function plotCharts(charts, dc, binWidth)
     charts.amountHistogram.chart
         .dimension(charts.amountHistogram.dimension)
         .group(charts.amountHistogram.group, 'Transaction amount')
-        .valueAccessor( function(d) { return d.value.count; } )
+        .valueAccessor( function(d) { return  d.value.logarithmicCount; } )
         .x(d3.scale.linear().domain([charts.extrema.minAmount - binWidth, charts.extrema.maxAmount + binWidth]))
+//        .y(d3.scale.log().domain([0, 4])base(10))
         .ordinalColors(['#377eb8'])
-        .yAxisLabel("n")
+        .yAxisLabel("log(n)")
         .renderHorizontalGridLines(true)
         .xAxisLabel("Amount")
         .margins({top: 10, right: 20, bottom: 50, left: 65})
@@ -614,6 +635,9 @@ function plotCharts(charts, dc, binWidth)
     charts.amountHistogram.chart.xAxis().ticks(5);
     // Set bar width.
     charts.amountHistogram.chart.xUnits(dc.units.fp.precision(binWidth * 1.1));
+    // Format numbers: From 10000 to 10k.
+    charts.amountHistogram.chart.xAxis().tickFormat(d3.format('.2s'))
+    charts.amountHistogram.chart.yAxis().tickFormat(d3.format('.2s'))
 
     // Configure transactions frequency plot.
     charts.transactionFequencyHistogram.chart
@@ -650,22 +674,25 @@ function plotCharts(charts, dc, binWidth)
         .existenceAccessor(function(d) {
             return d.value.transactions.length > 0 && d.value.transactions[0]["Amount"] != 0;
         })
-        .colorAccessor(function(d) {
-            return d.key[2];
-        })
+        .symbolSize(3.5)
+//        .colorAccessor(function(d) {
+//            return d.key[2];
+//        })
         .keyAccessor(function(d) {
             return d.key[0];
          })
-        .colors(scatterplotColors)
+//        .colors(scatterplotColors)
         .excludedOpacity(0.75)
         .mouseZoomable(true)
         .margins({top: 5, right: 20, bottom: 50, left: 65})
         .yAxis().ticks(4);
     charts.transactionScatterplot.chart.xAxis().ticks(5);
+    // Format numbers: From 10000 to 10k.
+    charts.transactionScatterplot.chart.yAxis().tickFormat(d3.format('.2s'))
 
     // Configure monthly balance chart.
     charts.monthlyBalanceBoxplot.chart
-        .height(275)
+        .height(295)
 //        .y(d3.scale.linear().domain([-maxExpensesByMonth * 1.1, maxIncomeByMonth * 1.1]))
         .elasticY(true)
         .yAxisLabel('€')
@@ -674,11 +701,12 @@ function plotCharts(charts, dc, binWidth)
         .margins({top: 5, right: 20, bottom: 50, left: 65})
         .renderHorizontalGridLines(true)
         .yAxis().ticks(6);
+    // Format numbers: From 10000 to 10k.
+    charts.monthlyBalanceBoxplot.chart.yAxis().tickFormat(d3.format('.2s'))
 
     // Configure agent balance chart.
     charts.balanceByAgentBarchart.chart
         .height(150)
-        .width(175)
 //        .y(d3.scale.linear().domain([charts.extrema.minAmountByUserandTType, charts.extrema.maxAmountByUserandTType]))
         .elasticY(true)
         .x(d3.scale.ordinal())
@@ -690,8 +718,10 @@ function plotCharts(charts, dc, binWidth)
         .group(charts.balanceByAgentBarchart.group)
         .barPadding(0.1)
         .renderHorizontalGridLines(true)
-        .margins({top: 5, right: 20, bottom: 50, left: 45})
+        .margins({top: 5, right: 20, bottom: 50, left: 55})
         .yAxis().ticks(4);
+    // Format numbers: From 10000 to 10k.
+    charts.balanceByAgentBarchart.chart.yAxis().tickFormat(d3.format('.2s'))
 
     // Configure beneficary balance charts.
     charts.balanceByBeneficiaryBarchart.chart
@@ -708,8 +738,10 @@ function plotCharts(charts, dc, binWidth)
         .group(charts.balanceByBeneficiaryBarchart.group)
         .barPadding(0.1)
         .renderHorizontalGridLines(true)
-        .margins({top: 5, right: 20, bottom: 50, left: 45})
+        .margins({top: 5, right: 20, bottom: 50, left: 55})
         .yAxis().ticks(4);
+    // Format numbers: From 10000 to 10k.
+    charts.balanceByBeneficiaryBarchart.chart.yAxis().tickFormat(d3.format('.2s'))
 
     // todo In backend: Make sure agent is not included in list of beneficiaries for amortizations.
     // Configure community balance charts.
@@ -728,8 +760,10 @@ function plotCharts(charts, dc, binWidth)
         .valueAccessor(function(d) { return d.value; })
         .barPadding(0.1)
         .renderHorizontalGridLines(true)
-        .margins({top: 5, right: 20, bottom: 50, left: 45})
+        .margins({top: 5, right: 20, bottom: 50, left: 55})
         .yAxis().ticks(4);
+    // Format numbers: From 10000 to 10k.
+    charts.communityBalanceBarchart.chart.yAxis().tickFormat(d3.format('.2s'))
 
      // Data table for individual entries.
     charts.entriesTable.chart

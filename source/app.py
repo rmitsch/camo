@@ -23,6 +23,8 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1] in app.config['ALLOWED_EXTENSIONS']
 
 app = Flask(__name__)
+# Define version.
+version = "1.5"
 
 # This is the path to the upload directory
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/")
@@ -34,7 +36,7 @@ app.config['ALLOWED_EXTENSIONS'] = set(['ods'])
 # root: Render HTML.
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", version=version)
 
 
 # Process file upload.
@@ -56,7 +58,7 @@ def upload():
 # Show dashboard.
 @app.route("/dashboard")
 def dashboard():
-    return render_template("dashboard.html")
+    return render_template("dashboard.html", version=version)
 
 
 # Route for fetching data from spreadsheet.

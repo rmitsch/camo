@@ -102,7 +102,25 @@ div.panel {
 }
 
 /* Styling search field. */
-#transactionSearch {
+.searchContainer {
     float: right;
+    position: relative;
+}
+
+#transactionSearch {
     cursor: text;
+    margin-top: 10px;
+    border-radius: 5px;
+    display: block;
+}
+
+#searchIcon {
+    position: absolute;
+    top: 15px;
+    right: 5px;
+}
+
+/* Title icon. */
+#title_icon {
+    margin-top: -3px;
 }
