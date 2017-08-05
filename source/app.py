@@ -7,7 +7,7 @@
 #   1. Start virtual env. (see link above).
 #       source py3env/bin/activate
 #   1a. Install dependencies in virtual environment.
-#       pip install ...
+#       py3env/bin/pip3.5 install ...
 #   2. Execute app.py with path to virtual env. inside project (py3env/bin/python3 source/app.py).
 import os
 from flask import Flask
