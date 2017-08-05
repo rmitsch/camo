@@ -566,7 +566,7 @@ function plotCharts(charts, dc, binWidth)
 
 
     charts.timeLinechart.chart
-		.height(170)
+		.height(145)
         .margins({top: 10, right: 50, bottom: 40, left: 50})
         .transitionDuration(500)
         .elasticY(true)
@@ -577,7 +577,7 @@ function plotCharts(charts, dc, binWidth)
         .xAxisLabel("Month")
         .renderHorizontalGridLines(true)
         .x(d3.time.scale().domain([charts.extrema.minDate, charts.extrema.maxDate]))
-        .legend(dc.legend().x(80).y(20).itemHeight(13).gap(5))
+        .legend(dc.legend().x(80).y(10).itemHeight(13).gap(5))
         .compose([
             balanceByDateChart,
             cumulativeBalanceByDateChart
@@ -662,7 +662,7 @@ function plotCharts(charts, dc, binWidth)
                                 .domain(["Income", "Expenses"])
                                 .range(["green", "red"]);
     charts.transactionScatterplot.chart
-        .height(150)
+        .height(137)
         .x(d3.time.scale().domain([charts.extrema.minDate, charts.extrema.maxDate]))
         .y(d3.scale.linear().domain([charts.extrema.minAmount, charts.extrema.maxAmount]))
         .yAxisLabel("€")

@@ -29,6 +29,8 @@ div.accordion {
     border: none;
     outline: none;
     transition: 0.4s;
+    padding-top: 6px;
+    padding-bottom: 6px;
 }
 
 /* Add a background color to the button if it is clicked on (add the .active class with JS), and when you move the mouse over it (hover) */
@@ -101,6 +103,12 @@ div.panel {
     padding-right: 5px;
 }
 
+/* Shamelessly hacking CSS for dc.js. */
+.chart-wrapper {
+	margin-bottom: 0px;
+	margin-top: 5px;
+}
+
 /* Styling search field. */
 .searchContainer {
     float: right;
@@ -123,4 +131,9 @@ div.panel {
 /* Title icon. */
 #title_icon {
     margin-top: -3px;
+}
+
+/* Transactions button. */
+#transactionsColumn {
+	padding-top: 5px;
 }
