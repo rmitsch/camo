@@ -1,0 +1,12 @@
+# Ignore .git and .cache folders.
+.git
+.cache
+
+# All files in /data, but not the filder itself.
+data/*
+
+# Pycharm files.
+source/.idea/
+
+# Virtual python environment.
+py3env
