@@ -24,9 +24,9 @@ def allowed_file(filename):
 
 app = Flask(__name__)
 # Define version.
-version = "1.6"
+version = "1.6.1"
 
-# This is the path to the upload directory
+# This is the path to the upload directory.
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/")
 # These are the extension that we are accepting to be uploaded.
 # Currently only .ods supported.

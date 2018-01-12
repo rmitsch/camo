@@ -435,8 +435,11 @@ function generateGraphObjects(entries, dc)
                                             // If this is an amortization: Has to be treated differently in order to
                                             // achieve parity with non-relevant measures. Therefore: Modify equation
                                             // to calculate contribution to community balance.
-                                            return d["Category"] !== "Amortization" ?
-                                                    (d["Amount"] - d["originalAmount"]) : d["Amount"];
+                                            // Return rounded amount.
+                                            res = 	d["Category"] !== "Amortization" ?
+                                            		(d["Amount"] - d["originalAmount"]) : d["Amount"];
+
+											return res;
                                         }
 
                                         // If record is an unfolded one: Return amount for this user and record.
@@ -546,7 +549,7 @@ function generateGraphObjects(entries, dc)
  * Plots prepared chart data.
  * @param charts Charts object.
  * @param dc dc.js instance.
- * @param binWidth Width of bins used for histogram of transactoin amounts.
+ * @param binWidth Width of bins used for histogram of transaction amounts.
  */
 function plotCharts(charts, dc, binWidth)
 {
@@ -585,8 +588,10 @@ function plotCharts(charts, dc, binWidth)
         .brushOn(true);
     // Set ticks.
     charts.timeLinechart.chart.yAxis().ticks(4);
+    charts.timeLinechart.chart.xAxis().ticks(6);
     // todo Calculate xUnits. How?
-    charts.timeLinechart.chart.xUnits(function(){ return 1.7; });
+    var numberOfMonths = charts.timeLinechart.balanceByDateBarchart.group.all().length;
+    charts.timeLinechart.chart.xUnits(function(){ return numberOfMonths / 5.6; });
     // Format numbers: From 10000 to 10k.
     charts.timeLinechart.chart.yAxis().tickFormat(d3.format('.2s'))
 
@@ -667,7 +672,7 @@ function plotCharts(charts, dc, binWidth)
         .y(d3.scale.linear().domain([charts.extrema.minAmount, charts.extrema.maxAmount]))
         .yAxisLabel("€")
         .xAxisLabel("Days")
-        .clipPadding(10)
+        .clipPadding(0)
         .renderHorizontalGridLines(true)
         .dimension(charts.transactionScatterplot.dimension)
         .group(charts.transactionScatterplot.group)
@@ -689,6 +694,11 @@ function plotCharts(charts, dc, binWidth)
     charts.transactionScatterplot.chart.xAxis().ticks(5);
     // Format numbers: From 10000 to 10k.
     charts.transactionScatterplot.chart.yAxis().tickFormat(d3.format('.2s'))
+    charts.transactionScatterplot.chart.on('pretransition', function(chart) {
+        charts.transactionScatterplot.chart.selectAll('g.row')
+            .on('mouseover', console.log("over"))
+        console.log("in here")
+    });
 
     // Configure monthly balance chart.
     charts.monthlyBalanceBoxplot.chart
@@ -761,9 +771,9 @@ function plotCharts(charts, dc, binWidth)
         .barPadding(0.1)
         .renderHorizontalGridLines(true)
         .margins({top: 5, right: 20, bottom: 50, left: 55})
-        .yAxis().ticks(4);
+        .yAxis().ticks(3);
     // Format numbers: From 10000 to 10k.
-    charts.communityBalanceBarchart.chart.yAxis().tickFormat(d3.format('.2s'))
+    //charts.communityBalanceBarchart.chart.yAxis().tickFormat(d3.format('.2s'))
 
      // Data table for individual entries.
     charts.entriesTable.chart
@@ -790,5 +800,4 @@ function plotCharts(charts, dc, binWidth)
 
     // Render charts.
     dc.renderAll();
-
 }
