@@ -518,7 +518,6 @@ function generateGraphObjects(entries, dc)
 	charts.communityBalanceBarchart.group       = roundGroup(balanceForCommunity, 2);
     charts.entriesTable.group                   = null;
     // Subcharts for timeLinechart.
-    charts.timeLinechart.balanceByDateBarchart.group           = roundGroup(sumByDate, 2);
     charts.timeLinechart.cumulativeBalanceByDateLinechart.group = roundGroup(cumulativeBalanceByDate, 2);
 
 	// --------------------------------------------------
@@ -538,7 +537,6 @@ function generateGraphObjects(entries, dc)
 	charts.communityBalanceBarchart.chart       = dc.barChart(charts.communityBalanceBarchart.targetDiv);
     charts.entriesTable.chart                   = dc.dataTable(charts.entriesTable.targetDiv);
     // Subcharts for timeLinechart.
-    charts.timeLinechart.balanceByDateBarchart.chart            = dc.barChart(charts.timeLinechart.chart);
     charts.timeLinechart.cumulativeBalanceByDateLinechart.chart = dc.lineChart(charts.timeLinechart.chart);
 
     // Return charts object.
@@ -557,12 +555,8 @@ function plotCharts(charts, dc, binWidth)
     var log10 = Math.log(10);
 
     // Configure time chart.
-    var balanceByDateChart              = charts.timeLinechart.balanceByDateBarchart.chart
-                                            .group(charts.timeLinechart.balanceByDateBarchart.group, 'Balance');
-
     var cumulativeBalanceByDateChart    = charts.timeLinechart.cumulativeBalanceByDateLinechart.chart
                                             .group(charts.timeLinechart.cumulativeBalanceByDateLinechart.group, 'Cumulative balance')
-                                            .dashStyle([5, 5])
                                             .renderDataPoints(true)
                                             .interpolate("step")
                                             .renderArea(false);
@@ -580,9 +574,8 @@ function plotCharts(charts, dc, binWidth)
         .xAxisLabel("Month")
         .renderHorizontalGridLines(true)
         .x(d3.time.scale().domain([charts.extrema.minDate, charts.extrema.maxDate]))
-        .legend(dc.legend().x(80).y(10).itemHeight(13).gap(5))
+        //.legend(dc.legend().x(80).y(10).itemHeight(13).gap(5))
         .compose([
-            balanceByDateChart,
             cumulativeBalanceByDateChart
         ])
         .brushOn(true);
@@ -590,7 +583,7 @@ function plotCharts(charts, dc, binWidth)
     charts.timeLinechart.chart.yAxis().ticks(4);
     charts.timeLinechart.chart.xAxis().ticks(6);
     // todo Calculate xUnits. How?
-    var numberOfMonths = charts.timeLinechart.balanceByDateBarchart.group.all().length;
+    var numberOfMonths = charts.timeLinechart.cumulativeBalanceByDateLinechart.group.all().length;
     charts.timeLinechart.chart.xUnits(function(){ return numberOfMonths / 5.6; });
     // Format numbers: From 10000 to 10k.
     charts.timeLinechart.chart.yAxis().tickFormat(d3.format('.2s'))
@@ -694,11 +687,6 @@ function plotCharts(charts, dc, binWidth)
     charts.transactionScatterplot.chart.xAxis().ticks(5);
     // Format numbers: From 10000 to 10k.
     charts.transactionScatterplot.chart.yAxis().tickFormat(d3.format('.2s'))
-    charts.transactionScatterplot.chart.on('pretransition', function(chart) {
-        charts.transactionScatterplot.chart.selectAll('g.row')
-            .on('mouseover', console.log("over"))
-        console.log("in here")
-    });
 
     // Configure monthly balance chart.
     charts.monthlyBalanceBoxplot.chart
