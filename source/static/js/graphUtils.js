@@ -223,8 +223,10 @@ function generateGraphObjects(entries, dc)
 	charts.communityBalanceBarchart     = {};
 	charts.entriesTable                 = {};
     // Subcharts for timeLinechart.
-    charts.timeLinechart.balanceByDateBarchart             = {};
-    charts.timeLinechart.cumulativeBalanceByDateLinechart   = {};
+    charts.timeLinechart.balanceByDateBarchart                  = {};
+    charts.timeLinechart.cumulativeBalanceByDateLinechart       = {};
+    charts.timeLinechart.investmentByDateBarchart               = {};
+    charts.timeLinechart.cumulativeInvestmentByDateLineChart    = {};
 
     // Create a crossfilter instance.
     charts.shared.crossfilter           = crossfilter(entries);
@@ -289,8 +291,10 @@ function generateGraphObjects(entries, dc)
 	// For time chart.
 	// Sum of all entries.
 	var sumByDate               = dateDim.group().reduceSum(function(d) {return d["Amount"];});
+    var investmentByDate        = dateDim.group().reduceSum(function(d) {return d["Category"] === "Investment" ? -d["Amount"] : 0;});
 	// Cumulative balance up to this point.
-    var cumulativeBalanceByDate = accumulate_group(sumByDate);
+    var cumulativeBalanceByDate     = accumulate_group(sumByDate);
+    var cumulativeInvestmentByDate  = accumulate_group(investmentByDate);
 	// Sum of all expenses.
 	var expenseSumByDate        = dateDim.group().reduceSum(function(d) {return d["Amount"] < 0 ? -d["Amount"] : 0;});
 	// Sum of all revenue.
@@ -518,7 +522,8 @@ function generateGraphObjects(entries, dc)
 	charts.communityBalanceBarchart.group       = roundGroup(balanceForCommunity, 2);
     charts.entriesTable.group                   = null;
     // Subcharts for timeLinechart.
-    charts.timeLinechart.cumulativeBalanceByDateLinechart.group = roundGroup(cumulativeBalanceByDate, 2);
+    charts.timeLinechart.cumulativeBalanceByDateLinechart.group     = roundGroup(cumulativeBalanceByDate, 2);
+    charts.timeLinechart.cumulativeInvestmentByDateLineChart.group  = roundGroup(cumulativeInvestmentByDate, 2);
 
 	// --------------------------------------------------
 	// 6. Create charts.
@@ -537,7 +542,8 @@ function generateGraphObjects(entries, dc)
 	charts.communityBalanceBarchart.chart       = dc.barChart(charts.communityBalanceBarchart.targetDiv);
     charts.entriesTable.chart                   = dc.dataTable(charts.entriesTable.targetDiv);
     // Subcharts for timeLinechart.
-    charts.timeLinechart.cumulativeBalanceByDateLinechart.chart = dc.lineChart(charts.timeLinechart.chart);
+    charts.timeLinechart.cumulativeBalanceByDateLinechart.chart     = dc.lineChart(charts.timeLinechart.chart);
+    charts.timeLinechart.cumulativeInvestmentByDateLineChart.chart  = dc.lineChart(charts.timeLinechart.chart);
 
     // Return charts object.
     return charts;
@@ -555,12 +561,18 @@ function plotCharts(charts, dc, binWidth)
     var log10 = Math.log(10);
 
     // Configure time chart.
-    var cumulativeBalanceByDateChart    = charts.timeLinechart.cumulativeBalanceByDateLinechart.chart
-                                            .group(charts.timeLinechart.cumulativeBalanceByDateLinechart.group, 'Cumulative balance')
-                                            .renderDataPoints(true)
-                                            .interpolate("step")
-                                            .renderArea(false);
-
+    var cumulativeBalanceByDateChart        = charts.timeLinechart.cumulativeBalanceByDateLinechart.chart
+                                                .group(charts.timeLinechart.cumulativeBalanceByDateLinechart.group, 'Cumulative balance')
+                                                .renderDataPoints(true)
+                                                .interpolate("step")
+                                                .renderArea(false)
+                                                .colors("blue");
+    var cumulativeBalanceByInvestmentChart  = charts.timeLinechart.cumulativeInvestmentByDateLineChart.chart
+                                                .group(charts.timeLinechart.cumulativeInvestmentByDateLineChart.group, 'Cumulative investment')
+                                                .renderDataPoints(true)
+                                                .interpolate("step")
+                                                .renderArea(false)
+                                                .colors("green");
 
     charts.timeLinechart.chart
 		.height(145)
@@ -574,9 +586,10 @@ function plotCharts(charts, dc, binWidth)
         .xAxisLabel("Month")
         .renderHorizontalGridLines(true)
         .x(d3.time.scale().domain([charts.extrema.minDate, charts.extrema.maxDate]))
-        //.legend(dc.legend().x(80).y(10).itemHeight(13).gap(5))
+        .legend(dc.legend().x(80).y(10).itemHeight(13).gap(5))
         .compose([
-            cumulativeBalanceByDateChart
+            cumulativeBalanceByDateChart,
+            cumulativeBalanceByInvestmentChart
         ])
         .brushOn(true);
     // Set ticks.
