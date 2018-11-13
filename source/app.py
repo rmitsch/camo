@@ -24,7 +24,7 @@ def allowed_file(filename):
 
 app = Flask(__name__)
 # Define version.
-version = "1.6.2"
+version = "1.7.0"
 
 # This is the path to the upload directory.
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/")

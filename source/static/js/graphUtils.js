@@ -214,6 +214,7 @@ function generateGraphObjects(entries, dc)
 	charts.categoryRowchart             = {};
 	charts.monthlyBalanceBoxplot        = {};
 	charts.balanceLabel                 = {};
+    charts.investmentLabel              = {};
 	charts.numberOfTransactionsLabel    = {};
 	charts.amountHistogram              = {};
 	charts.transactionFequencyHistogram = {};
@@ -247,6 +248,7 @@ function generateGraphObjects(entries, dc)
 	charts.categoryRowchart.targetDiv               = "#category-chart";
 	charts.monthlyBalanceBoxplot.targetDiv          = "#monthly-balance-chart";
 	charts.balanceLabel.targetDiv                   = "#balance-nd";
+    charts.investmentLabel.targetDiv                = "#investment-nd";
 	charts.numberOfTransactionsLabel.targetDiv      = "#transactions-nd";
 	charts.amountHistogram.targetDiv                = "#transactions-amount-chart";
 	charts.transactionFequencyHistogram.targetDiv   = "#transactions-frequency-chart";
@@ -352,8 +354,9 @@ function generateGraphObjects(entries, dc)
     );
 	// Get group for total amount of money spent.
     // Apparent outcome: Sum of money spent.
-	var totalAmount             = ndx.groupAll().reduceSum(function(d) {return d["Amount"];});
-
+	var totalAmount      = ndx.groupAll().reduceSum(function(d) {return d["Amount"];});
+    var investmentAmount = ndx.groupAll().reduceSum(function(d) {return d.Category === "Investment" ? -d["Amount"] : 0;});
+    
     // For transactions charts.
     var numTransactionsByDate   = weekDateDim.group().reduce(
         function(elements, item) {
@@ -494,6 +497,7 @@ function generateGraphObjects(entries, dc)
 	charts.categoryRowchart.dimension               = categoryDim;
 	charts.monthlyBalanceBoxplot.dimension          = monthDateDim;
 	charts.balanceLabel.dimension                   = null;
+    charts.investmentLabel.dimension                = null;
 	charts.numberOfTransactionsLabel.dimension      = null;
 	charts.amountHistogram.dimension                = roundedAmountDim;
 	charts.transactionFequencyHistogram.dimension   = weekDateDim;
@@ -513,6 +517,7 @@ function generateGraphObjects(entries, dc)
 	charts.categoryRowchart.group               = roundGroup(sumByCategory, 2);
 	charts.monthlyBalanceBoxplot.group          = one_bin(monthlyBalance, 'All months');
 	charts.balanceLabel.group                   = totalAmount;
+    charts.investmentLabel.group                = investmentAmount;
 	charts.numberOfTransactionsLabel.group      = all;
 	charts.amountHistogram.group                = transactionsByAmount;
 	charts.transactionFequencyHistogram.group   = numTransactionsByDate;
@@ -533,6 +538,7 @@ function generateGraphObjects(entries, dc)
 	charts.categoryRowchart.chart               = dc.rowChart(charts.categoryRowchart.targetDiv);
 	charts.monthlyBalanceBoxplot.chart          = dc.boxPlot(charts.monthlyBalanceBoxplot.targetDiv);
 	charts.balanceLabel.chart                   = dc.numberDisplay(charts.balanceLabel.targetDiv);
+    charts.investmentLabel.chart                = dc.numberDisplay(charts.investmentLabel.targetDiv);
 	charts.numberOfTransactionsLabel.chart      = dc.numberDisplay(charts.numberOfTransactionsLabel.targetDiv);
 	charts.amountHistogram.chart                = dc.barChart(charts.amountHistogram.targetDiv);
 	charts.transactionFequencyHistogram.chart   = dc.barChart(charts.transactionFequencyHistogram.targetDiv);
@@ -614,11 +620,18 @@ function plotCharts(charts, dc, binWidth)
     charts.categoryRowchart.chart.xAxis().tickFormat(d3.format('.2s'))
 
     // Configure measure for total balance.
-	charts.balanceLabel.chart
-		.valueAccessor(function(d){return d; })
-		.transitionDuration(0)
-		.group(charts.balanceLabel.group)
-		.formatNumber(d3.format(".3s"));
+    charts.balanceLabel.chart
+        .valueAccessor(function(d){return d; })
+        .transitionDuration(0)
+        .group(charts.balanceLabel.group)
+        .formatNumber(d3.format(".3s"));
+
+    // Configure measure for investment balance.
+    charts.investmentLabel.chart
+        .valueAccessor(function(d){return d; })
+        .transitionDuration(0)
+        .group(charts.investmentLabel.group)
+        .formatNumber(d3.format(".3s"));        
 
     // Configure measure for total number of transactions.
     // todo Use d3's logScale instead of manual calculation for log values (didn't work so far).

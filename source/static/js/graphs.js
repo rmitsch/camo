@@ -1,10 +1,3 @@
-//         next steps:
-//            - use bubble chart instead of scatterplot
-//            - use log scale for histogram of amount (?)
-//            - add todos to github
-//            - dockerize
-
-
 // https://groups.google.com/forum/#!topic/dc-js-user-group/yI6_cbvgfbU
 // Initiates loading of charts.
 queue()
