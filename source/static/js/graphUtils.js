@@ -582,14 +582,13 @@ function plotCharts(charts, dc, binWidth)
 
     charts.timeLinechart.chart
 		.height(145)
-        .margins({top: 10, right: 50, bottom: 40, left: 50})
+        .margins({top: 10, right: 10, bottom: 20, left: 50})
         .transitionDuration(500)
         .elasticY(true)
         .renderLabel(true)
         .mouseZoomable(false)
         .dimension(charts.timeLinechart.dimension)
         .yAxisLabel("€")
-        .xAxisLabel("Month")
         .renderHorizontalGridLines(true)
         .x(d3.time.scale().domain([charts.extrema.minDate, charts.extrema.maxDate]))
         .legend(dc.legend().x(80).y(10).itemHeight(13).gap(5))
@@ -614,7 +613,7 @@ function plotCharts(charts, dc, binWidth)
         .group(charts.categoryRowchart.group)
         .ordinalColors(['#377eb8'])
         .elasticX(true)
-        .margins({top: 10, right: 20, bottom: 50, left: 15});
+        .margins({top: 10, right: 10, bottom: 18, left: 15});
     charts.categoryRowchart.chart.xAxis().ticks(4);
     // Format numbers: From 10000 to 10k.
     charts.categoryRowchart.chart.xAxis().tickFormat(d3.format('.2s'))
@@ -652,8 +651,7 @@ function plotCharts(charts, dc, binWidth)
         .ordinalColors(['#377eb8'])
         .yAxisLabel("log(n)")
         .renderHorizontalGridLines(true)
-        .xAxisLabel("Amount")
-        .margins({top: 10, right: 20, bottom: 50, left: 65})
+        .margins({top: 10, right: 10, bottom: 20, left: 50})
         .height(100);
     charts.amountHistogram.chart.yAxis().ticks(2)
     charts.amountHistogram.chart.xAxis().ticks(5);
@@ -672,11 +670,10 @@ function plotCharts(charts, dc, binWidth)
         .ordinalColors(['#377eb8'])
         .renderHorizontalGridLines(true)
         .yAxisLabel("ƒ")
-        .xAxisLabel("Week")
-        .margins({top: 10, right: 20, bottom: 50, left: 65})
+        .margins({top: 10, right: 10, bottom: 20, left: 50})
         .height(100);
     charts.transactionFequencyHistogram.chart.yAxis().ticks(2);
-    charts.transactionFequencyHistogram.chart.xAxis().ticks(5);
+    charts.transactionFequencyHistogram.chart.xAxis().ticks(3);
     // Set bar width. Last factor should be 7 (number of days in bin, but doesn't seem dense enough.
     // todo Replace 10 with actual number of months.
     charts.transactionFequencyHistogram.chart.xUnits(dc.units.fp.precision(1000 * 60 * 60 * 24 * 10));
@@ -690,7 +687,6 @@ function plotCharts(charts, dc, binWidth)
         .x(d3.time.scale().domain([charts.extrema.minDate, charts.extrema.maxDate]))
         .y(d3.scale.linear().domain([charts.extrema.minAmount, charts.extrema.maxAmount]))
         .yAxisLabel("€")
-        .xAxisLabel("Days")
         .clipPadding(0)
         .renderHorizontalGridLines(true)
         .dimension(charts.transactionScatterplot.dimension)
@@ -698,7 +694,7 @@ function plotCharts(charts, dc, binWidth)
         .existenceAccessor(function(d) {
             return d.value.transactions.length > 0 && d.value.transactions[0]["Amount"] != 0;
         })
-        .symbolSize(3.5)
+        .symbolSize(2.5)
 //        .colorAccessor(function(d) {
 //            return d.key[2];
 //        })
@@ -708,7 +704,7 @@ function plotCharts(charts, dc, binWidth)
 //        .colors(scatterplotColors)
         .excludedOpacity(0.75)
         .mouseZoomable(true)
-        .margins({top: 5, right: 20, bottom: 50, left: 65})
+        .margins({top: 5, right: 10, bottom: 20, left: 50})
         .yAxis().ticks(4);
     charts.transactionScatterplot.chart.xAxis().ticks(5);
     // Format numbers: From 10000 to 10k.
@@ -722,7 +718,7 @@ function plotCharts(charts, dc, binWidth)
         .yAxisLabel('€')
         .dimension(charts.monthlyBalanceBoxplot.dimension) // this is actually wrong but can't brush anyway
         .group(charts.monthlyBalanceBoxplot.group)
-        .margins({top: 5, right: 20, bottom: 50, left: 65})
+        .margins({top: 5, right: 20, bottom: 20, left: 50})
         .renderHorizontalGridLines(true)
         .yAxis().ticks(6);
     // Format numbers: From 10000 to 10k.
@@ -736,13 +732,12 @@ function plotCharts(charts, dc, binWidth)
         .x(d3.scale.ordinal())
         .xUnits(dc.units.ordinal)
         .brushOn(false)
-        .xAxisLabel('User')
         .yAxisLabel('€')
         .dimension(charts.balanceByAgentBarchart.dimension)
         .group(charts.balanceByAgentBarchart.group)
         .barPadding(0.1)
         .renderHorizontalGridLines(true)
-        .margins({top: 5, right: 20, bottom: 50, left: 55})
+        .margins({top: 5, right: 10, bottom: 20, left: 50})
         .yAxis().ticks(4);
     // Format numbers: From 10000 to 10k.
     charts.balanceByAgentBarchart.chart.yAxis().tickFormat(d3.format('.2s'))
@@ -756,13 +751,12 @@ function plotCharts(charts, dc, binWidth)
         .x(d3.scale.ordinal())
         .xUnits(dc.units.ordinal)
         .brushOn(false)
-        .xAxisLabel('User')
         .yAxisLabel('€')
         .dimension(charts.balanceByBeneficiaryBarchart.dimension)
         .group(charts.balanceByBeneficiaryBarchart.group)
         .barPadding(0.1)
         .renderHorizontalGridLines(true)
-        .margins({top: 5, right: 20, bottom: 50, left: 55})
+        .margins({top: 5, right: 10, bottom: 20, left: 50})
         .yAxis().ticks(4);
     // Format numbers: From 10000 to 10k.
     charts.balanceByBeneficiaryBarchart.chart.yAxis().tickFormat(d3.format('.2s'))
@@ -777,14 +771,13 @@ function plotCharts(charts, dc, binWidth)
         .x(d3.scale.ordinal())
         .xUnits(dc.units.ordinal)
         .brushOn(false)
-        .xAxisLabel('User')
         .yAxisLabel('€')
         .dimension(charts.communityBalanceBarchart.dimension)
         .group(charts.communityBalanceBarchart.group)
         .valueAccessor(function(d) { return d.value; })
         .barPadding(0.1)
         .renderHorizontalGridLines(true)
-        .margins({top: 5, right: 20, bottom: 50, left: 55})
+        .margins({top: 5, right: 10, bottom: 20, left: 50})
         .yAxis().ticks(3);
     // Format numbers: From 10000 to 10k.
     //charts.communityBalanceBarchart.chart.yAxis().tickFormat(d3.format('.2s'))
@@ -803,7 +796,12 @@ function plotCharts(charts, dc, binWidth)
           function(d) { return d.value.transactions[0]["Category"]; },
           function(d) { return d.value.transactions[0]["Comment"]; },
           function(d) { return d.value.transactions[0]["Partner"]; },
-          function(d) { return d.value.transactions[0]["Date"]; },
+          function(d) { return (
+              d.value.transactions[0]["ExactDate"].getDate().toString().padStart(2, '0') + "." +
+              (d.value.transactions[0]["ExactDate"].getMonth() + 1).toString().padStart(2, '0') + "." +
+              d.value.transactions[0]["ExactDate"].getFullYear()
+            );
+          },
           function(d) { return d.value.transactions[0]["Payer"]; },
           function(d) { return d.value.transactions[0]["Beneficiaries"]; },
           // Re-calculate original amount
