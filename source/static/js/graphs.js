@@ -10,7 +10,7 @@ function makeGraphs(error, projectsJson, statesJson) {
     // Original entries as delivered by the backend.
 	var entries         = projectsJson;
 	// Auxiliary variable.
-    var binWidth        = 100;
+    var binWidth        = 200;
 
     // --------------------------------------------------
     // Prepare and extend projectsJson data.

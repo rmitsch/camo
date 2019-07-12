@@ -268,7 +268,7 @@ function generateGraphObjects(entries, dc)
 	var dateDim                 = ndx.dimension(function(d) { return d3.time.month(d["ExactDate"]); });
     var monthDateDim            = ndx.dimension(function(d) { return d3.time.month(d["ExactDate"]); });
 	var categoryDim             = ndx.dimension(function(d) { return d["Category"]; });
-	var weekDateDim             = ndx.dimension(function(d) { return d3.time.week(d["ExactDate"]); });
+	var weekDateDim             = ndx.dimension(function(d) { return d3.time.month(d["ExactDate"]); });
 	var idDim                   = ndx.dimension(function(d) { return d["ID"]; });
 	// For transactions charts.
     var scatterchartDim         = ndx.dimension(function (d) {
@@ -676,7 +676,7 @@ function plotCharts(charts, dc, binWidth)
     charts.transactionFequencyHistogram.chart.xAxis().ticks(3);
     // Set bar width. Last factor should be 7 (number of days in bin, but doesn't seem dense enough.
     // todo Replace 10 with actual number of months.
-    charts.transactionFequencyHistogram.chart.xUnits(dc.units.fp.precision(1000 * 60 * 60 * 24 * 10));
+    charts.transactionFequencyHistogram.chart.xUnits(function() { return 30; }); // dc.units.fp.precision(10)1000 * 60 * 60 * 24 * 10
 
     // Configure transactions scatterplot.
     var scatterplotColors   = d3.scale.ordinal()
