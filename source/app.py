@@ -1,73 +1,89 @@
-# @author rmitsch
-# @date 2017-07-01
-#
-#  To start:
-#   0. Create virtualenv inside project (http://stackoverflow.com/questions/10763440/how-to-install-python3-version-of-package-via-pip-on-ubuntu)
-#       virtualenv -p /usr/bin/python3 py3env
-#   1. Start virtual env. (see link above).
-#       source py3env/bin/activate
-#   1a. Install dependencies in virtual environment.
-#       py3env/bin/pip3.5 install ...
-#   2. Execute app.py with path to virtual env. inside project (py3env/bin/python3 source/app.py).
-import os
-from flask import Flask
-from flask import render_template
-from flask import request, redirect, url_for, send_from_directory
-# Import ODS Reader.
-from fileReader.ODSReader import ODSReader
+"""
+Note: Layout to be considered temporary until streamlit introduces native layouting options.
+todo:
+    - Move separate analyses into functions, branching off same root DF.
+    - Mixed layout (when supported by streamlit).
+"""
+
+import pandas as pd
+import streamlit as st
+import plotly
+import plotly.express as px
+import plotly.graph_objects as go
+import sys
+sys.path.append('../')
+import source.utils as utils
+from source.fileparsing import ODSReader
 
 
-# For a given file, return whether it's an allowed type or not
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1] in app.config['ALLOWED_EXTENSIONS']
+st.title("Batcave Cashflow")
+st.sidebar.title("Settings")
 
-app = Flask(__name__)
-# Define version.
-version = "1.7.1"
+# Read entries from spreadsheet, add artifical data points for investment so that line is drawn from beginning to end
+# of plot.
+entries: pd.DataFrame = utils.add_investment_fillers(ODSReader("/home/raphael/Documents/Finanzen/Cashflow.ods").entries)
 
-# This is the path to the upload directory.
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/")
-# These are the extension that we are accepting to be uploaded.
-# Currently only .ods supported.
-app.config['ALLOWED_EXTENSIONS'] = set(['ods'])
+# Gather all users (assuming that each user paid at least once).
+users: list = entries.From.unique().tolist()
 
+# One-hot encode beneficiaries.
+entries["n_beneficiaries"] = entries.To.str.split(",").apply(len)
+for user in users:
+    entries["amount_to_" + user] = entries.To.str.contains(user) * entries.Amount / entries.n_beneficiaries
 
-# root: Render HTML.
-@app.route("/")
-def index():
-    return render_template("index.html", version=version)
+# Sum values per day and category. Ignore amortization entries for time chart, since they are only interesting for the
+# community balance calculation.
+entries_cumulative: pd.DataFrame = entries[
+    entries.Category != "Amortization"
+].groupby(["Date", "Category"]).sum().reset_index()
+entries_cumulative.Date = pd.to_datetime(entries_cumulative.Date)
+investment_entry_idx: pd.Series = (entries_cumulative.Category == "Investment")
 
+# Assemble dataframe for cumulative sum of investment and non-investement data.
+entries_cumulative = pd.concat([
+    # Investment is treated as special kind expense, but here we want it to be displayed as positive in the charts.
+    entries_cumulative[investment_entry_idx].set_index(["Category", "Date"])[["Amount"]].cumsum() * -1,
+    # Everything but investment and amortization, since they are to be treated differently.
+    entries_cumulative[~investment_entry_idx].set_index(["Category", "Date"])[["Amount"]].cumsum()
+]).reset_index()
 
-# Process file upload.
-@app.route('/upload', methods=['POST'])
-def upload():
-    # Get the name of the uploaded file
-    file = request.files['file']
-    # Check if the file is one of the allowed types/extensions
-    if file and allowed_file(file.filename):
-        # Move the file from the temporal folder to the upload folder we set up.
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], "spreadsheet.ods"))
-        # Redirect the user to the uploaded_file route, which will basicaly show on the browser the uploaded file.
-        return redirect("/dashboard")
+# Assign color values for series.
+entries_cumulative["color"] = (entries_cumulative.Category == "Investment").replace({True: "Orange", False: "Blue"})
 
-    else:
-        return "Wrong file format."
+# Plot cashflow.
+plot: plotly.graph_objects.Figure = px.line(
+    entries_cumulative, x="Date", y="Amount", title='', color="color", line_shape="hvh"
+)
+plot.update_layout(
+    margin=dict(l=0, r=0, t=0, b=0),
+    legend=dict(x=0, y=0)
+)
+plot.update_yaxes(range=[entries_cumulative.min().Amount * 1.1, entries_cumulative.max().Amount * 1.1])
+st.plotly_chart(plot, width=800, height=170)
 
+# Initialize data for community balance.
+community_balance_data: dict = {user: {"paid_by": 0, "paid_for": 0} for user in users}
+# Limit entries to those with more than one recipient (or amortizations).
+amortizations: pd.DataFrame = entries[entries.Category == "Amortization"]
+community_entries: pd.DataFrame = entries[
+    (entries.Category != "Amortization") &
+    ((entries.n_beneficiaries > 1) | (~entries.From.isin(entries.To)))
+]
+st.write("amort")
+st.write(amortizations)
+st.write("comm entrei")
+st.write(community_entries)
 
-# Show dashboard.
-@app.route("/dashboard")
-def dashboard():
-    return render_template("dashboard.html", version=version)
+# Compute all sums that were paid _by_ given user. Assuming payer is only ever a single person.
+community_balances: dict = community_entries.groupby("From").sum()[["Amount"]].to_dict()["Amount"]
 
+# Compute all sums that were paid _for_ given user.
+for user in users:
+    community_balances[user] -= community_entries["amount_to_" + user].sum()
 
-# Route for fetching data from spreadsheet.
-@app.route("/entries")
-def getEntries():
-    # Read from file with hardcoded file path.
-    reader = ODSReader(os.path.join(app.config['UPLOAD_FOLDER'], "spreadsheet.ods"))
-    # Get data as JSON object.
-    return reader.getEntries()
+# Consider amortizations.
+for ix, row in amortizations.groupby(["From", "To"]).sum()[["Amount"]].iterrows():
+    community_balances[ix[0]] -= row.Amount
+    community_balances[ix[1]] += row.Amount
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=True)
+st.write("Community balance:", community_balances)
