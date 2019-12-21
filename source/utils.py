@@ -1,6 +1,41 @@
 import pandas as pd
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from source.fileparsing import ODSReader
+
+
+def compute_community_balance(entries: pd.DataFrame, users: List[str]) -> Dict[str, float]:
+    """
+    Computes community balances for all specified users.
+    :param entries:
+    :type entries:
+    :param users:
+    :type users:
+    :return: Dictionary with community balances by user. Negative number means user is owed, positive number means user
+    owes.
+    :rtype: Dict[str, float]
+    """
+    # Initialize data for community balance.
+    community_balance_data: dict = {user: {"paid_by": 0, "paid_for": 0} for user in users}
+    # Limit entries to those with more than one recipient (or amortizations).
+    amortizations: pd.DataFrame = entries[entries.Category == "Amortization"]
+    community_entries: pd.DataFrame = entries[
+        (entries.Category != "Amortization") &
+        ((entries.n_beneficiaries > 1) | (~entries.From.isin(entries.To)))
+    ]
+
+    # Compute all sums that were paid _by_ given user. Assuming payer is only ever a single person.
+    community_balances: dict = community_entries.groupby("From").sum()[["Amount"]].to_dict()["Amount"]
+
+    # Compute all sums that were paid _for_ given user.
+    for user in users:
+        community_balances[user] -= community_entries["amount_to_" + user].sum()
+
+    # Consider amortizations.
+    for ix, row in amortizations.groupby(["From", "To"]).sum()[["Amount"]].iterrows():
+        community_balances[ix[0]] -= row.Amount
+        community_balances[ix[1]] += row.Amount
+
+    return community_balances
 
 
 def load_data(spreadsheet_path: str) -> Tuple[pd.DataFrame, List[str]]:
@@ -12,7 +47,7 @@ def load_data(spreadsheet_path: str) -> Tuple[pd.DataFrame, List[str]]:
     :rtype: Tuple[pd.DataFrame, List[str]]
     """
     # Load and parse spreadsheet.
-    entries: pd.DataFrame = add_investment_fillers(ODSReader(spreadsheet_path).entries)
+    entries: pd.DataFrame = add_investment_filler_entries(ODSReader(spreadsheet_path).entries)
 
     # Gather all users (assuming that each user paid at least once).
     users: list = entries.From.unique().tolist()
@@ -56,7 +91,7 @@ def compute_liquidity_timeseries(entries: pd.DataFrame) -> pd.DataFrame:
     return entries_cumulative
 
 
-def add_investment_fillers(entries: pd.DataFrame) -> pd.DataFrame:
+def add_investment_filler_entries(entries: pd.DataFrame) -> pd.DataFrame:
     """
     Adds fillers for investment so that glyphs in charts match with start and end of entire timespan under
     consideration.
