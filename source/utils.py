@@ -60,35 +60,52 @@ def load_data(spreadsheet_path: str) -> Tuple[pd.DataFrame, List[str]]:
     return entries, users
 
 
-def compute_liquidity_timeseries(entries: pd.DataFrame) -> pd.DataFrame:
+def compute_liquidity_timeseries(entries: pd.DataFrame, users: List[str]) -> pd.DataFrame:
     """
     Computes cumulative sums for liquidity/investment timeseries chart.
     :param entries:
     :type entries:
-    :return:
-    :rtype:
+    :param users:
+    :type users:
+    :return: Cumulative entries (as dataframe) by user.
+    :rtype: pd.DataFrame
     """
 
     # Sum values per day and category. Ignore amortization entries for time chart, since they are only interesting for
     # the community balance calculation.
     entries_cumulative: pd.DataFrame = entries[
         entries.Category != "Amortization"
-        ].groupby(["Date", "Category"]).sum().reset_index()
+    ].groupby(["Date", "Category"]).sum().reset_index()
     entries_cumulative.Date = pd.to_datetime(entries_cumulative.Date)
     investment_entry_idx: pd.Series = (entries_cumulative.Category == "Investment")
 
-    # Assemble dataframe for cumulative sum of investment and non-investement data.
-    entries_cumulative = pd.concat([
-        # Investment is treated as special kind expense, but here we want it to be displayed as positive in the charts.
-        entries_cumulative[investment_entry_idx].set_index(["Category", "Date"])[["Amount"]].cumsum() * -1,
-        # Everything but investment and amortization, since they are to be treated differently.
-        entries_cumulative[~investment_entry_idx].set_index(["Category", "Date"])[["Amount"]].cumsum()
-    ]).reset_index()
+    entries_cumulative_by_user: list = []
+    for user in users:
+        amount_user_col: str = "amount_to_" + user
+        # Assemble dataframe for cumulative sum of investment and non-investement data.
+        df: pd.DataFrame = pd.concat([
+            # Investment is treated as special kind expense, but here we want it to be displayed as positive in the
+            # charts.
+            entries_cumulative[investment_entry_idx].set_index(["Category", "Date"])[[amount_user_col]].cumsum() * -1,
+            # Everything but investment and amortization, since they are to be treated differently.
+            entries_cumulative[~investment_entry_idx].set_index(["Category", "Date"])[[amount_user_col]].cumsum()
+        ]).reset_index().rename(columns={amount_user_col: "Amount"})
+
+        # Add user identifier.
+        df["user"] = user
+
+        # Append to list.
+        entries_cumulative_by_user.append(df)
+
+    # Merge dataframes.
+    entries_cumulative_by_user: pd.DataFrame = pd.concat(entries_cumulative_by_user)
 
     # Assign color values for series.
-    entries_cumulative["color"] = (entries_cumulative.Category == "Investment").replace({True: "Orange", False: "Blue"})
+    entries_cumulative_by_user["color"] = (
+            entries_cumulative_by_user.Category == "Investment"
+    ).replace({True: "Orange", False: "Blue"})
 
-    return entries_cumulative
+    return entries_cumulative_by_user
 
 
 def add_investment_filler_entries(entries: pd.DataFrame) -> pd.DataFrame:
