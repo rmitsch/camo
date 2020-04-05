@@ -100,11 +100,6 @@ def compute_liquidity_timeseries(entries: pd.DataFrame, users: List[str]) -> pd.
     # Merge dataframes.
     entries_cumulative_by_user: pd.DataFrame = pd.concat(entries_cumulative_by_user)
 
-    # Assign color values for series.
-    entries_cumulative_by_user["color"] = (
-            entries_cumulative_by_user.Category == "Investment"
-    ).replace({True: "Orange", False: "Blue"})
-
     return entries_cumulative_by_user
 
 
@@ -113,9 +108,7 @@ def add_investment_filler_entries(entries: pd.DataFrame) -> pd.DataFrame:
     Adds fillers for investment so that glyphs in charts match with start and end of entire timespan under
     consideration.
     :param entries: Dataframe with entries from spreadsheet.
-    :type entries: pd.DataFrame
     :return: Entries with appended filler entries for investments.
-    :rtype: pd.DataFrame
     """
 
     return entries.append(pd.DataFrame([

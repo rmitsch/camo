@@ -50,22 +50,23 @@ entries_in_restricted_date_range: pd.DataFrame = entries[
 # Get timeseries data, filter.
 entries_cumulative_by_user: pd.DataFrame = utils.compute_liquidity_timeseries(entries, users)
 entries_cumulative_by_user = entries_cumulative_by_user[
-    # Apply date range limits.
-    (entries_cumulative_by_user.Date >= first_day) &
-    (entries_cumulative_by_user.Date <= last_day) &
     # Limit to user to show cash flow for.
     (entries_cumulative_by_user.user == show_cashflow_for)
 ]
+entries_cumulative_by_user.Category = entries_cumulative_by_user.Category.apply(
+    lambda x: "Investment" if x == "Investment" else "Cashflow"
+)
+
 # todo Add/check filler investment entries in entries_cumulative to make sure investment line is visible event if fewer
 #  then two events are in selected timeframe.
 
-# Plot cashflow.
+# Plot cumulative cashflow.
 plot: plotly.graph_objects.Figure = px.line(
     entries_cumulative_by_user,
     x="Date",
     y="Amount",
     title="Liquidity and Investment Over Time",
-    color="color",
+    color="Category",
     line_shape="hvh"
 )
 plot.update_layout(
@@ -73,7 +74,24 @@ plot.update_layout(
     legend=dict(x=0, y=0)
 )
 plot.update_yaxes(range=[entries_cumulative_by_user.min().Amount * 0.9, entries_cumulative_by_user.max().Amount * 1.1])
-st.plotly_chart(plot, width=800, height=170)
+st.plotly_chart(plot, width=800, height=150)
+
+# Plot expenses by category and month.
+target_col: str = "amount_to_" + show_cashflow_for
+df: pd.DataFrame = entries_in_restricted_date_range.copy(deep=True)
+df.Date = pd.to_datetime(df.Date.astype(str).str[:-2] + "01")
+plot: plotly.graph_objects.Figure = px.bar(
+    df.groupby(["Category"])[[target_col]].sum().rename(columns={target_col: "Amount"}).reset_index(),
+    x="Category",
+    y="Amount",
+    title="Sum per category for user"
+)
+plot.update_layout(
+    margin=dict(l=0, b=0),  # , r=0, t=30,
+    legend=dict(x=0, y=0)
+)
+st.plotly_chart(plot, width=850, height=350)
+
 
 # Initialize filtered data for community balance.
 community_balances: Dict[str, float] = utils.compute_community_balance(
